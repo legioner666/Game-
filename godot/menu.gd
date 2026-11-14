@@ -178,6 +178,12 @@ func _build_settings(box: VBoxContainer) -> void:
 		_click()
 		stress_pressed.emit())
 	box.add_child(stress)
+	var rep := _button(I18n.t("copy_report"), Color(0.2, 0.4, 0.55), 120, 46)
+	rep.pressed.connect(func():
+		_click()
+		Report.copy_to_clipboard()
+		rep.text = I18n.t("copied"))
+	box.add_child(rep)
 	var back := _button(I18n.t("back"), Color(0.85, 0.6, 0.1), 150, 58)
 	back.pressed.connect(func(): _go("main"))
 	box.add_child(back)

@@ -308,6 +308,18 @@ var _play_time := 0.0
 var _paused := false
 var _over := false
 var _built_any := false
+var _spent := 0
+var _lost_coins := 0
+var _wave_leaks := 0
+var _leaks_total := 0
+var _wave_start_t := 0.0
+var _wave_hp0 := 0
+var _first_build := true
+var _pause_count := 0
+var _fps_sum := 0.0
+var _fps_n := 0
+var _fps_min := 999.0
+var _fps_t := 0.0
 
 # батчі
 var _b_enemy: Array = []
@@ -358,6 +370,7 @@ func _ready() -> void:
 	_build_plates()
 	_build_ui()
 	_rebuild_obstacles()
+	Report.begin_run()
 	if _show_kind != "":
 		_paused = true
 		_show_overlay(_show_kind)
@@ -819,6 +832,22 @@ func _show_overlay(kind: String) -> void:
 	var b3 := _make_button(I18n.t("to_menu"), Vector2(0, 140), Color(0.25, 0.3, 0.45), 58)
 	b3.pressed.connect(func(): exit_to_menu.emit())
 	box.add_child(b3)
+	var b4 := _make_button(I18n.t("copy_report"), Vector2(0, 110), Color(0.2, 0.4, 0.55), 46)
+	b4.pressed.connect(func():
+		Report.copy_to_clipboard()
+		b4.text = I18n.t("copied"))
+	box.add_child(b4)
+
+
+func _report_end(result: String) -> void:
+	var fps_avg := _fps_sum / maxf(1.0, float(_fps_n))
+	Report.ev(_play_time, "summary", "result=%s wave=%d base=%d collected=%d spent=%d lost_on_ground=%d leaked=%d pauses=%d fps_avg=%.0f fps_min=%.0f" % [result, _wave + 1, _base_hp, _total_collected, _spent, _lost_coins, _leaks_total, _pause_count, fps_avg, minf(_fps_min, fps_avg)])
+	Report.end_run(result)
+
+
+func _exit_tree() -> void:
+	if not _over:
+		_report_end("quit")
 
 
 func _toggle_pause() -> void:
@@ -826,6 +855,8 @@ func _toggle_pause() -> void:
 		return
 	_paused = not _paused
 	if _paused:
+		_pause_count += 1
+		Report.ev(_play_time, "pause", "")
 		_show_overlay("pause")
 	elif _overlay:
 		_overlay.queue_free()
@@ -923,6 +954,13 @@ func _process(delta: float) -> void:
 		_render_all(delta)
 		_check_shots()
 		return
+	_fps_t += delta
+	if _fps_t >= 1.0:
+		_fps_t = 0.0
+		var fps := Engine.get_frames_per_second()
+		_fps_sum += fps
+		_fps_n += 1
+		_fps_min = minf(_fps_min, fps)
 	var steps := _fast_steps
 	var dt := delta if steps == 1 else 1.0 / 30.0
 	dt = minf(dt, 0.05)
@@ -991,11 +1029,16 @@ func _start_wave(idx: int) -> void:
 	else:
 		_banner(I18n.t("wave_start") % (idx + 1))
 	_snd("spawn", 0.8)
+	_wave_leaks = 0
+	_wave_start_t = _play_time
+	_wave_hp0 = _base_hp
+	Report.ev(_play_time, "wave_start", "wave=%d base=%d carried=%d" % [idx + 1, _base_hp, _carried])
 	if _autoplay:
 		print("[bot] wave %d start t=%.0f base=%d carried=%d" % [idx + 1, _play_time, _base_hp, _carried])
 
 
 func _wave_cleared() -> void:
+	Report.ev(_play_time, "wave_clear", "wave=%d duration=%.1f base=%d->%d leaked=%d lost_coins=%d" % [_wave + 1, _play_time - _wave_start_t, _wave_hp0, _base_hp, _wave_leaks, _lost_coins])
 	if _wave >= WAVES.size() - 1:
 		_finish(true)
 		return
@@ -1013,6 +1056,7 @@ func _finish(won: bool) -> void:
 	if _over:
 		return
 	_over = true
+	_report_end("win" if won else "lose")
 	_snd("win" if won else "lose")
 	_joy_id = -1
 	_joy_vec = Vector2.ZERO
@@ -1156,6 +1200,8 @@ func _furthest_in_range(from: Vector3, r: float) -> int:
 
 
 func _hit_base(dmg: int) -> void:
+	_wave_leaks += 1
+	_leaks_total += 1
 	_base_hp = maxi(0, _base_hp - dmg)
 	_shake = 0.6
 	_snd("hit")
@@ -1439,6 +1485,7 @@ func _update_coins(delta: float) -> void:
 			0:
 				if c.age > COIN_LIFETIME:
 					remove = true
+					_lost_coins += 1
 				else:
 					var dx := c.pos.x - hp.x
 					var dz := c.pos.z - hp.z
@@ -1495,6 +1542,7 @@ func _update_plates(delta: float) -> void:
 	while _deposit_timer <= 0.0 and _carried > 0 and active.progress < cost:
 		_deposit_timer += DEPOSIT_INTERVAL
 		_carried -= 1
+		_spent += 1
 		active.progress += 1
 		changed = true
 		var c := Coin.new()
@@ -1512,6 +1560,8 @@ func _update_plates(delta: float) -> void:
 
 func _complete_plate(p: Plate) -> void:
 	p.level += 1
+	Report.ev(_play_time, "build" if p.level == 1 else "upgrade", "%s level=%d first=%s" % [p.kind, p.level, str(_first_build)])
+	_first_build = false
 	p.progress = 0
 	p.cooldown = 0.3
 	_built_any = true

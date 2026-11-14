@@ -8,6 +8,8 @@ const STR := {
 	"tagline": {"uk": "Збирай золото. Будуй вежі. Зупини орду.", "en": "Collect gold. Build towers. Stop the horde."},
 	"play": {"uk": "Грати", "en": "Play"},
 	"settings": {"uk": "Налаштування", "en": "Settings"},
+	"copy_report": {"uk": "Скопіювати звіт", "en": "Copy report"},
+	"copied": {"uk": "Скопійовано ✓", "en": "Copied ✓"},
 	"back": {"uk": "Назад", "en": "Back"},
 	"language": {"uk": "Мова", "en": "Language"},
 	"lang_name": {"uk": "Українська", "en": "English"},
