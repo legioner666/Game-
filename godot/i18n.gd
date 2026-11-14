@@ -55,7 +55,7 @@ const STR := {
 	"boost_barrier": {"uk": "Бар'єр", "en": "Barrier"},
 	"spell_freeze": {"uk": "Крига", "en": "Freeze"},
 	"spell_meteor": {"uk": "Метеор", "en": "Meteor"},
-	"spell_meteor_aim": {"uk": "Торкнись поля, щоб вибрати місце удару. Метеор — скасувати.", "en": "Tap the battlefield to choose the impact. Meteor — cancel."},
+	"spell_meteor_aim": {"uk": "Торкнись поля й відпусти для удару. Метеор — скасувати.", "en": "Touch the field and release to strike. Meteor — cancel."},
 }
 
 
