@@ -54,12 +54,12 @@ const ALLY_AGGRO := 7.0
 const ALLY_SPEED := 4.6
 
 # Типи ворогів: 0 — рядовий, 1 — бігун, 2 — здоровань
-const E_HP := [22.0, 12.0, 260.0]
+const E_HP := [60.0, 34.0, 500.0]
 const E_SPD_MIN := [2.0, 3.6, 1.2]
 const E_SPD_MAX := [2.6, 4.2, 1.5]
 const E_DMG := [1, 1, 5]
-const E_COINS := [1, 1, 10]
-const E_SCALE := [1.0, 1.0, 1.0]
+const E_COINS := [2, 2, 14]
+const E_SCALE := [1.2, 1.1, 1.0]
 const E_CONTACT_DPS := [4.0, 3.0, 14.0]
 const E_OFFSET := [0.9, 0.9, 0.35]
 
@@ -77,11 +77,11 @@ const PLATE_DEFS := [
 ]
 # Група: [тип, кількість, старт (с), інтервал (с)]
 const WAVES := [
-	[[0, 14, 0.0, 0.6]],
-	[[0, 22, 0.0, 0.5], [1, 8, 4.0, 0.9]],
-	[[0, 32, 0.0, 0.45], [1, 14, 3.0, 0.7], [2, 1, 12.0, 1.0]],
-	[[0, 44, 0.0, 0.4], [1, 20, 2.0, 0.6], [2, 2, 10.0, 6.0]],
-	[[0, 58, 0.0, 0.35], [1, 28, 2.0, 0.5], [2, 4, 8.0, 4.0]],
+	[[0, 7, 0.0, 1.2]],
+	[[0, 11, 0.0, 1.0], [1, 4, 4.0, 1.8]],
+	[[0, 16, 0.0, 0.9], [1, 7, 3.0, 1.4], [2, 1, 12.0, 1.0]],
+	[[0, 22, 0.0, 0.8], [1, 10, 2.0, 1.2], [2, 2, 10.0, 6.0]],
+	[[0, 29, 0.0, 0.7], [1, 14, 2.0, 1.0], [2, 4, 8.0, 4.0]],
 ]
 
 
@@ -1274,12 +1274,12 @@ func _update_hero(delta: float) -> void:
 	var speed := _real_speed
 	var walk := clampf(speed / HERO_SPEED, 0.0, 1.0)
 	var desired := _hero_yaw
-	if speed > 1.2:
+	var tgt := _nearest_enemy(p, HERO_RANGE)
+	if tgt >= 0:
+		# цілимося у ворога навіть на бігу
+		desired = atan2(-(e_px[tgt] - p.x), -(e_pz[tgt] - p.z))
+	elif speed > 1.2:
 		desired = atan2(-_hero_vel.x, -_hero_vel.z)
-	else:
-		var tgt := _nearest_enemy(p, HERO_RANGE)
-		if tgt >= 0:
-			desired = atan2(-(e_px[tgt] - p.x), -(e_pz[tgt] - p.z))
 	_hero_yaw = lerp_angle(_hero_yaw, desired, 1.0 - exp(-14.0 * delta))
 	_hero.rotation.y = _hero_yaw
 
