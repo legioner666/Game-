@@ -3,8 +3,9 @@ config_version=5
 
 [application]
 
-config/name="Crown Rush Stress Test"
-run/main_scene="res://stress_test.tscn"
+config/name="Crown Rush"
+run/main_scene="res://main.tscn"
+run/quit_on_go_back=false
 config/features=PackedStringArray("4.4", "Mobile")
 
 [display]

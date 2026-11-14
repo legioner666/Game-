@@ -224,7 +224,7 @@ func _make_button(text: String, cb: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(190, 130)
+	b.custom_minimum_size = Vector2(170, 130)
 	b.add_theme_font_size_override("font_size", 44)
 	b.pressed.connect(cb)
 	return b
@@ -253,6 +253,7 @@ func _build_ui() -> void:
 	row.add_child(_make_button("+500", _change_count.bind(500)))
 	_shadow_button = _make_button("", _toggle_shadows)
 	row.add_child(_shadow_button)
+	row.add_child(_make_button("Меню", func(): get_tree().change_scene_to_file("res://main.tscn")))
 	_update_shadow_button()
 
 
