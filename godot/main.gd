@@ -9,6 +9,7 @@ const Sfx = preload("res://sfx.gd")
 var _sfx: Node
 var _menu: Node
 var _game: Node
+var _level := 0
 
 
 func _ready() -> void:
@@ -19,8 +20,10 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a == "--autoplay" or a == "--direct":
 			direct = true
+		elif a.begins_with("--level="):
+			_level = clampi(int(a.substr(8)), 0, Settings.LEVEL_COUNT - 1)
 	if direct:
-		_start_game()
+		_start_game(_level)
 	else:
 		_show_menu()
 
@@ -43,10 +46,13 @@ func _show_menu() -> void:
 	_menu.stress_pressed.connect(func(): get_tree().change_scene_to_file("res://stress_test.tscn"))
 
 
-func _start_game() -> void:
+func _start_game(level: int) -> void:
+	_level = level
 	_clear()
 	_game = Game.new()
 	_game.sfx = _sfx
+	_game.level = level
 	add_child(_game)
 	_game.exit_to_menu.connect(_show_menu)
-	_game.restart.connect(_start_game)
+	_game.restart.connect(func(): _start_game(_level))
+	_game.next_level.connect(func(): _start_game(mini(_level + 1, Settings.LEVEL_COUNT - 1)))

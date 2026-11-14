@@ -1,7 +1,7 @@
 extends CanvasLayer
 ## Головне меню та налаштування.
 
-signal play_pressed
+signal play_pressed(level: int)
 signal stress_pressed
 
 const I18n = preload("res://i18n.gd")
@@ -73,7 +73,7 @@ func _ready() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
-		if _page == "settings":
+		if _page != "main":
 			_go("main")
 		else:
 			get_tree().quit()
@@ -103,6 +103,7 @@ func _button(text: String, color: Color, height: float = 150.0, font: int = 62) 
 	b.add_theme_color_override("font_color", tc)
 	b.add_theme_color_override("font_hover_color", tc)
 	b.add_theme_color_override("font_pressed_color", tc)
+	b.add_theme_color_override("font_disabled_color", Color("#7d8a93"))
 	b.add_theme_stylebox_override("normal", _style(color))
 	b.add_theme_stylebox_override("hover", _style(color.lightened(0.1)))
 	b.add_theme_stylebox_override("pressed", _style(color.darkened(0.15)))
@@ -170,6 +171,8 @@ func _build() -> void:
 
 	if _page == "main":
 		_build_main(box)
+	elif _page == "levels":
+		_build_levels(box)
 	else:
 		_build_settings(box)
 
@@ -185,13 +188,39 @@ func _build_main(box: VBoxContainer) -> void:
 	spacer.custom_minimum_size = Vector2(0, 120)
 	box.add_child(spacer)
 	var play := _button(I18n.t("play"), Color("#E8B547"), 190, 82)
-	play.pressed.connect(func():
-		_click()
-		play_pressed.emit())
+	play.pressed.connect(func(): _go("levels"))
 	box.add_child(play)
 	var st := _button(I18n.t("settings"), Color("#2f4b5f"), 150, 58)
 	st.pressed.connect(func(): _go("settings"))
 	box.add_child(st)
+
+
+func _build_levels(box: VBoxContainer) -> void:
+	box.add_child(_label(I18n.t("choose_level"), 90, Color("#F8D874")))
+	var sp := Control.new()
+	sp.custom_minimum_size = Vector2(0, 40)
+	box.add_child(sp)
+	for lv in Settings.LEVEL_COUNT:
+		var open := Settings.unlocked(lv)
+		var row := Control.new()
+		row.custom_minimum_size = Vector2(0, 190)
+		box.add_child(row)
+		var b := _button(I18n.t("level") % (lv + 1), Color("#E8B547") if open else Color("#3a4650"), 190, 72)
+		b.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		b.disabled = not open
+		var l := lv
+		b.pressed.connect(func():
+			_click()
+			play_pressed.emit(l))
+		row.add_child(b)
+		if open:
+			var st := StarRow.new(int(Settings.stars[lv]), 44.0)
+			st.position = Vector2(60, 70)
+			st.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			row.add_child(st)
+	var back := _button(I18n.t("back"), Color("#2f4b5f"), 140, 54)
+	back.pressed.connect(func(): _go("main"))
+	box.add_child(back)
 
 
 func _toggle_row(box: VBoxContainer, key: String, value: bool, setter: Callable) -> void:

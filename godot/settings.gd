@@ -7,6 +7,8 @@ static var lang := "uk"
 static var shadows := true
 static var vibration := true
 static var sound := true
+static var stars: Array = [0, 0, 0]
+const LEVEL_COUNT := 3
 
 
 static func load_settings() -> void:
@@ -19,6 +21,8 @@ static func load_settings() -> void:
 	shadows = bool(cf.get_value("main", "shadows", shadows))
 	vibration = bool(cf.get_value("main", "vibration", vibration))
 	sound = bool(cf.get_value("main", "sound", sound))
+	for i in LEVEL_COUNT:
+		stars[i] = int(cf.get_value("progress", "stars_%d" % i, 0))
 
 
 static func save_settings() -> void:
@@ -27,4 +31,16 @@ static func save_settings() -> void:
 	cf.set_value("main", "shadows", shadows)
 	cf.set_value("main", "vibration", vibration)
 	cf.set_value("main", "sound", sound)
+	for i in LEVEL_COUNT:
+		cf.set_value("progress", "stars_%d" % i, stars[i])
 	cf.save(PATH)
+
+
+static func unlocked(level: int) -> bool:
+	return level == 0 or int(stars[level - 1]) > 0
+
+
+static func record_stars(level: int, n: int) -> void:
+	if n > int(stars[level]):
+		stars[level] = n
+		save_settings()

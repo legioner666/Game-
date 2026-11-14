@@ -6,6 +6,7 @@ extends Node3D
 
 signal exit_to_menu
 signal restart
+signal next_level
 
 const Models = preload("res://models.gd")
 const I18n = preload("res://i18n.gd")
@@ -76,6 +77,8 @@ const PLATE_DEFS := [
 	{"kind": "barracks", "pos": Vector3(1.5, 0, 12.8)},
 ]
 # Група: [тип, кількість, старт (с), інтервал (с)]
+const LEVEL_MULT := [1.0, 1.5, 1.9]
+const LEVEL_BRUTES := [0, 1, 2]
 const WAVES := [
 	[[0, 7, 0.0, 1.2]],
 	[[0, 11, 0.0, 1.0], [1, 4, 4.0, 1.8]],
@@ -298,6 +301,9 @@ var _shake := 0.0
 var _cam_x := 0.0
 var _cam_z := 0.0
 
+var level := 0
+var _waves: Array = []
+var _stars_earned := 0
 var _wave := 0
 var _phase := 0  # 0 — пауза між хвилями, 1 — хвиля йде
 var _inter_t := 4.0
@@ -370,6 +376,7 @@ var _bot_log_t := 0.0
 func _ready() -> void:
 	randomize()
 	_parse_args()
+	_waves = _make_waves(clampi(level, 0, LEVEL_MULT.size() - 1))
 	_build_path()
 	_build_world()
 	_build_batches()
@@ -378,6 +385,7 @@ func _ready() -> void:
 	_build_ui()
 	_rebuild_obstacles()
 	Report.begin_run()
+	Report.ev(0.0, "level", "n=%d" % (level + 1))
 	if _show_kind != "":
 		_paused = true
 		_show_overlay(_show_kind)
@@ -401,6 +409,25 @@ func _parse_args() -> void:
 
 
 # ---------- Стежка ----------
+
+func _make_waves(lv: int) -> Array:
+	var m: float = LEVEL_MULT[lv]
+	var out: Array = []
+	for wi in WAVES.size():
+		# складність наростає: перша хвиля м'якша, остання — повна
+		var mw: float = lerpf(1.0 + (m - 1.0) * 0.35, m, float(wi) / (WAVES.size() - 1))
+		var groups: Array = []
+		for g in WAVES[wi]:
+			var t: int = g[0]
+			var cnt: int = g[1]
+			var n: int = cnt if t == 2 else int(ceil(cnt * mw))
+			groups.append([t, n, g[2], float(g[3]) / sqrt(mw)])
+		out.append(groups)
+	if LEVEL_BRUTES[lv] > 0:
+		for wi in [out.size() - 2, out.size() - 1]:
+			out[wi].append([2, LEVEL_BRUTES[lv], 6.0, 5.0])
+	return out
+
 
 func _build_path() -> void:
 	var pts := PackedVector3Array()
@@ -825,6 +852,8 @@ func _banner(text: String, color: Color = Color(1.0, 0.9, 0.45)) -> void:
 
 
 func _show_overlay(kind: String) -> void:
+	if kind != "pause":
+		_hint_label.visible = false
 	if _overlay:
 		_overlay.queue_free()
 	_overlay = Control.new()
@@ -838,8 +867,8 @@ func _show_overlay(kind: String) -> void:
 	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	box.offset_left = -400
 	box.offset_right = 400
-	box.offset_top = -380
-	box.offset_bottom = 380
+	box.offset_top = -620
+	box.offset_bottom = 620
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 28)
 	_overlay.add_child(box)
@@ -861,9 +890,25 @@ func _show_overlay(kind: String) -> void:
 			txt = I18n.t("stats") % [_total_collected, "%d:%02d" % [secs / 60, secs % 60]]
 		else:
 			txt = I18n.t("lose_stats") % [_wave + 1, _total_collected]
+		if kind == "win":
+			var srow := HBoxContainer.new()
+			srow.alignment = BoxContainer.ALIGNMENT_CENTER
+			srow.add_child(StarRow.new(_stars_earned, 90.0))
+			box.add_child(srow)
 		var st := _make_label(txt, 52, Color(0.9, 0.95, 1.0))
 		st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(st)
+	if kind == "win":
+		if level < Settings.LEVEL_COUNT - 1:
+			var bn := _make_button(I18n.t("next_level"), Vector2(0, 150), Color(0.91, 0.71, 0.28), 60)
+			for cn in ["font_color", "font_hover_color", "font_pressed_color"]:
+				bn.add_theme_color_override(cn, Color("#2a2015"))
+			bn.pressed.connect(func(): next_level.emit())
+			box.add_child(bn)
+		else:
+			var done := _make_label(I18n.t("all_done"), 56, Color(0.97, 0.85, 0.45))
+			done.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(done)
 	if kind == "pause":
 		var b1 := _make_button(I18n.t("resume"), Vector2(0, 140), Color(0.2, 0.62, 0.3), 58)
 		b1.pressed.connect(_toggle_pause)
@@ -1060,7 +1105,7 @@ func _update_waves(delta: float) -> void:
 
 func _start_wave(idx: int) -> void:
 	_spawn_queue.clear()
-	var groups: Array = WAVES[idx]
+	var groups: Array = _waves[idx]
 	for g in groups:
 		var t: int = g[0]
 		var cnt: int = g[1]
@@ -1071,7 +1116,7 @@ func _start_wave(idx: int) -> void:
 	_spawn_queue.sort_custom(func(a, b): return a[0] < b[0])
 	_wave_clock = 0.0
 	_phase = 1
-	if idx == WAVES.size() - 1:
+	if idx == _waves.size() - 1:
 		_banner(I18n.t("last_wave"), Color(1.0, 0.45, 0.35))
 	else:
 		_banner(I18n.t("wave_start") % (idx + 1))
@@ -1086,7 +1131,7 @@ func _start_wave(idx: int) -> void:
 
 func _wave_cleared() -> void:
 	Report.ev(_play_time, "wave_clear", "wave=%d duration=%.1f base=%d->%d leaked=%d lost_coins=%d" % [_wave + 1, _play_time - _wave_start_t, _wave_hp0, _base_hp, _wave_leaks, _lost_coins])
-	if _wave >= WAVES.size() - 1:
+	if _wave >= _waves.size() - 1:
 		_finish(true)
 		return
 	var bonus := 6 + _wave * 4
@@ -1103,6 +1148,11 @@ func _finish(won: bool) -> void:
 	if _over:
 		return
 	_over = true
+	_stars_earned = 0
+	if won:
+		_stars_earned = 3 if _base_hp >= 15 else (2 if _base_hp >= 8 else 1)
+		if not _autoplay:
+			Settings.record_stars(level, _stars_earned)
 	_report_end("win" if won else "lose")
 	_snd("win" if won else "lose")
 	_joy_id = -1
@@ -1794,7 +1844,7 @@ func _update_hud() -> void:
 	_stop_label.visible = _stop_t > 0.0
 	_coin_label.text = str(_carried)
 	_hp_bar.value = _base_hp
-	_wave_label.text = I18n.t("wave") % [mini(_wave + 1, WAVES.size()), WAVES.size()]
+	_wave_label.text = I18n.t("wave") % [mini(_wave + 1, _waves.size()), _waves.size()]
 	if _phase == 0:
 		_sub_label.text = I18n.t("next_wave") % maxi(1, int(ceil(_inter_t)))
 	else:
