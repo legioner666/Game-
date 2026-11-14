@@ -55,7 +55,7 @@ const E_SPD_MIN := [2.0, 3.6, 1.2]
 const E_SPD_MAX := [2.6, 4.2, 1.5]
 const E_DMG := [1, 1, 5]
 const E_COINS := [2, 2, 14]
-const E_SCALE := [1.2, 1.1, 1.0]
+const E_SCALE := [1.1, 1.0, 1.0]
 const E_CONTACT_DPS := [4.0, 3.0, 14.0]
 const E_OFFSET := [0.9, 0.9, 0.35]
 
@@ -90,7 +90,7 @@ class Batch:
 	var n := 0
 	var cap := 0
 
-	func _init(parent: Node3D, mesh: Mesh, capacity: int, shadows: bool = true) -> void:
+	func _init(parent: Node3D, mesh: Mesh, capacity: int, shadows: bool = true, material: Material = null) -> void:
 		cap = capacity
 		mm = MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -101,6 +101,8 @@ class Batch:
 		buf.resize(capacity * 12)
 		node = MultiMeshInstance3D.new()
 		node.multimesh = mm
+		if material != null:
+			node.material_override = material
 		if not shadows:
 			node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		parent.add_child(node)
@@ -650,9 +652,9 @@ func _build_decor() -> void:
 
 func _build_batches() -> void:
 	_b_enemy = [
-		Batch.new(self, Models.grunt_mesh(), MAX_ENEMIES),
-		Batch.new(self, Models.runner_mesh(), MAX_ENEMIES),
-		Batch.new(self, Models.brute_mesh(), 40),
+		Batch.new(self, Models.grunt_mesh(), MAX_ENEMIES, true, Models.walk_material(0.42, 10.0, 0.2, 0.08, false)),
+		Batch.new(self, Models.runner_mesh(), MAX_ENEMIES, true, Models.walk_material(0.42, 15.0, 0.22, 0.1, true)),
+		Batch.new(self, Models.brute_mesh(), 40, true, Models.walk_material(0.85, 5.5, 0.3, 0.12, false)),
 	]
 	_b_ally = Batch.new(self, Models.ally_mesh(), 30)
 	_b_coin = Batch.new(self, Models.coin_mesh(), MAX_COINS, false)
