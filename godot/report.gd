@@ -13,6 +13,7 @@ static var _lines: Array = []
 static var _active := false
 static var _t0 := 0
 static var _id := ""
+static var _run_id := 0
 
 
 static func anon_id() -> String:
@@ -30,14 +31,20 @@ static func anon_id() -> String:
 	return _id
 
 
-static func begin_run() -> void:
+static func begin_run() -> int:
 	if _active:
 		end_run("abandoned")
+	_run_id += 1
 	_active = true
 	_lines.clear()
 	_t0 = Time.get_ticks_msec()
 	var d := Time.get_datetime_string_from_system(false, true)
 	ev(0.0, "start", "date=%s device=%s os=%s" % [d, OS.get_model_name(), OS.get_version()])
+	return _run_id
+
+
+static func is_current(id: int) -> bool:
+	return _active and id == _run_id
 
 
 ## t — ігровий час у секундах, name — тип події, data — "ключ=значення" через пробіл.

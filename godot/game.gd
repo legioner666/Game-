@@ -77,9 +77,11 @@ const PLATE_DEFS := [
 	{"kind": "barracks", "pos": Vector3(1.5, 0, 12.8)},
 ]
 # Група: [тип, кількість, старт (с), інтервал (с)]
-const LEVEL_MULT := [1.0, 1.9, 2.5]
-const LEVEL_HP := [1.0, 1.2, 1.4]
-const LEVEL_SPD := [1.0, 1.04, 1.08]
+const LEVEL_MULT := [1.0, 2.1, 2.4]
+const LEVEL_HP := [1.0, 1.2, 1.3]
+const LEVEL_SPD := [1.0, 1.04, 1.06]
+const LEVEL_COIN := [1.0, 1.1, 1.25]
+const LEVEL_START := [15, 20, 30]
 const LEVEL_BRUTES := [0, 2, 3]
 const WAVES := [
 	[[0, 7, 0.0, 1.2]],
@@ -306,6 +308,7 @@ var _cam_z := 0.0
 var level := 0
 var _waves: Array = []
 var _stars_earned := 0
+var _run_id := 0
 var _wave := 0
 var _phase := 0  # 0 — пауза між хвилями, 1 — хвиля йде
 var _inter_t := 4.0
@@ -379,6 +382,7 @@ func _ready() -> void:
 	randomize()
 	_parse_args()
 	_waves = _make_waves(clampi(level, 0, LEVEL_MULT.size() - 1))
+	_carried = LEVEL_START[clampi(level, 0, LEVEL_START.size() - 1)]
 	_build_path()
 	_build_world()
 	_build_batches()
@@ -386,7 +390,7 @@ func _ready() -> void:
 	_build_plates()
 	_build_ui()
 	_rebuild_obstacles()
-	Report.begin_run()
+	_run_id = Report.begin_run()
 	Report.ev(0.0, "level", "n=%d" % (level + 1))
 	if _show_kind != "":
 		_paused = true
@@ -417,7 +421,7 @@ func _make_waves(lv: int) -> Array:
 	var out: Array = []
 	for wi in WAVES.size():
 		# складність наростає: перша хвиля м'якша, остання — повна
-		var mw: float = lerpf(1.0 + (m - 1.0) * 0.35, m, float(wi) / (WAVES.size() - 1))
+		var mw: float = lerpf(1.0 + (m - 1.0) * 0.25, m, float(wi) / (WAVES.size() - 1))
 		var groups: Array = []
 		for g in WAVES[wi]:
 			var t: int = g[0]
@@ -964,6 +968,8 @@ func _show_overlay(kind: String) -> void:
 
 
 func _report_end(result: String) -> void:
+	if not Report.is_current(_run_id):
+		return
 	var fps_avg := _fps_sum / maxf(1.0, float(_fps_n))
 	Report.ev(_play_time, "summary", "result=%s wave=%d base=%d collected=%d spent=%d lost_on_ground=%d leaked=%d pauses=%d fps_avg=%.0f fps_min=%.0f worst_frame_ms=%.0f frames_over_25ms=%d/%d" % [result, _wave + 1, _base_hp, _total_collected, _spent, _lost_coins, _leaks_total, _pause_count, fps_avg, minf(_fps_min, fps_avg), _frame_max * 1000.0, _slow_frames, _frames])
 	Report.end_run(result)
@@ -1295,7 +1301,8 @@ func _cleanup_enemies() -> void:
 			var t := e_type[i]
 			if killed:
 				var wp := Vector3(e_px[i], 0.0, e_pz[i])
-				_spawn_coins(wp, E_COINS[t])
+				var cn: float = E_COINS[t] * LEVEL_COIN[level]
+				_spawn_coins(wp, int(cn) + (1 if randf() < cn - floorf(cn) else 0))
 				_burst(wp + Vector3(0, 0.5, 0), 0, 5 if t != 2 else 14, 3.5, 4.0)
 				if _kill_snd_cd <= 0.0:
 					_snd("kill", randf_range(0.9, 1.2))
