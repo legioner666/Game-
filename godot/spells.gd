@@ -3,6 +3,7 @@ extends Control
 ## Damage application and reporting remain in the game integration hook.
 
 signal spell_requested(kind: String)
+signal aim_cancelled
 
 const I18n = preload("res://i18n.gd")
 const FREEZE_CD := 30.0
@@ -38,6 +39,8 @@ class Glyph extends Control:
 
 
 var _level := 0
+var _targeting := false
+var _aim_hint: Label
 var _wave_active := false
 var _has_targets := false
 var _freeze_remaining := 0.0
@@ -64,6 +67,23 @@ func setup(lv: int) -> void:
 	_add_button(row, "freeze", Color(0.14, 0.41, 0.56))
 	if _level >= 1:
 		_add_button(row, "meteor", Color(0.61, 0.27, 0.18))
+	_aim_hint = Label.new()
+	_aim_hint.text = I18n.t("spell_meteor_aim")
+	_aim_hint.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_aim_hint.offset_left = 90
+	_aim_hint.offset_right = -90
+	_aim_hint.offset_top = 385
+	_aim_hint.offset_bottom = 468
+	_aim_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_aim_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_aim_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_aim_hint.add_theme_font_size_override("font_size", 42)
+	_aim_hint.add_theme_color_override("font_color", Color(1.0, 0.93, 0.72))
+	_aim_hint.add_theme_color_override("font_outline_color", Color(0.09, 0.08, 0.1))
+	_aim_hint.add_theme_constant_override("outline_size", 12)
+	_aim_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_aim_hint.visible = false
+	add_child(_aim_hint)
 	_refresh()
 
 
@@ -141,6 +161,8 @@ func set_wave_active(active: bool, has_targets: bool) -> void:
 	if _wave_active != active or _has_targets != has_targets:
 		_wave_active = active
 		_has_targets = has_targets
+		if _targeting and (not active or not has_targets):
+			cancel_targeting()
 		_refresh()
 
 
@@ -160,6 +182,7 @@ func _refresh() -> void:
 		var b: Button = _buttons[kind]
 		var remaining: float = float(_cooldowns[kind])
 		b.disabled = remaining > 0.0 or not _wave_active or not _has_targets
+		b.modulate = Color(1.0, 0.91, 0.65) if kind == "meteor" and _targeting else Color.WHITE
 		var cd: ProgressBar = _bars[kind]
 		cd.value = cd.max_value - remaining
 		var timer: Label = _cd_labels[kind]
@@ -174,22 +197,50 @@ func activate(kind: String, px: PackedFloat32Array, pz: PackedFloat32Array) -> D
 		_cooldowns["freeze"] = FREEZE_CD
 		_refresh()
 		return {"kind": "freeze", "hits": px.size()}
-	if kind != "meteor" or px.is_empty():
-		return {}
-	var center_idx := _densest_target(px, pz)
-	var center := Vector2(px[center_idx], pz[center_idx])
-	var hit_indices: Array[int] = []
-	for i in px.size():
-		var dx: float = px[i] - center.x
-		var dz: float = pz[i] - center.y
-		if dx * dx + dz * dz <= METEOR_RADIUS * METEOR_RADIUS:
-			hit_indices.append(i)
-	_cooldowns["meteor"] = METEOR_CD
+	# Meteor does not auto-fire: the player chooses a position on the ground.
+	return {}
+
+
+func is_targeting() -> bool:
+	return _targeting
+
+
+func begin_targeting() -> bool:
+	if not _buttons.has("meteor") or _targeting:
+		return false
+	if not _wave_active or not _has_targets or float(_cooldowns["meteor"]) > 0.0:
+		return false
+	_targeting = true
+	_aim_hint.visible = true
 	_refresh()
-	return {
-		"kind": "meteor", "center": center, "indices": hit_indices,
-		"hits": hit_indices.size(), "damage": METEOR_DAMAGE,
-	}
+	return true
+
+
+func cancel_targeting() -> void:
+	if not _targeting:
+		return
+	_targeting = false
+	_aim_hint.visible = false
+	aim_cancelled.emit()
+	_refresh()
+
+
+func confirm_meteor() -> bool:
+	if not _targeting or not _wave_active or not _has_targets:
+		return false
+	if float(_cooldowns["meteor"]) > 0.0:
+		return false
+	_cooldowns["meteor"] = METEOR_CD
+	cancel_targeting()
+	_refresh()
+	return true
+
+
+func suggested_target(px: PackedFloat32Array, pz: PackedFloat32Array) -> Vector2:
+	if px.is_empty():
+		return Vector2.ZERO
+	var idx: int = _densest_target(px, pz)
+	return Vector2(px[idx], pz[idx])
 
 
 func _densest_target(px: PackedFloat32Array, pz: PackedFloat32Array) -> int:
