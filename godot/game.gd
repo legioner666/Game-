@@ -13,6 +13,7 @@ const I18n = preload("res://i18n.gd")
 const Settings = preload("res://settings.gd")
 const Boosts = preload("res://boosts.gd")
 const Spells = preload("res://spells.gd")
+const MeteorFX = preload("res://meteor_fx.gd")
 
 var sfx: Node
 
@@ -346,6 +347,9 @@ var _b_hp_bg: Batch
 var _b_hp_fg: Batch
 var _boosts: Boosts
 var _spells: Spells
+var _meteor_fx: MeteorFX
+var _meteor_touch_id := -1
+var _meteor_touch_point := Vector3.ZERO
 
 # керування
 var _joy_id := -1
@@ -397,7 +401,11 @@ func _ready() -> void:
 	_ui.add_child(_spells)
 	_spells.setup(level)
 	_spells.spell_requested.connect(_on_spell_requested)
+	_spells.aim_cancelled.connect(_on_meteor_cancelled)
 	_spells.visible = not _autoplay
+	_meteor_fx = MeteorFX.new()
+	add_child(_meteor_fx)
+	_meteor_fx.impacted.connect(_on_meteor_impact)
 	_rebuild_obstacles()
 	_run_id = Report.begin_run()
 	Report.ev(0.0, "level", "n=%d" % (level + 1))
@@ -1001,25 +1009,70 @@ func _on_boost_picked(kind: String) -> void:
 func _on_spell_requested(kind: String) -> void:
 	if _paused or _over or _autoplay:
 		return
+	if kind == "meteor":
+		if _spells.is_targeting():
+			_spells.cancel_targeting()
+			return
+		if _spells.begin_targeting():
+			var suggested: Vector2 = _spells.suggested_target(e_px, e_pz)
+			_meteor_fx.show_target(Vector3(suggested.x, 0.0, suggested.y))
+			_joy_id = -1
+			_joy_vec = Vector2.ZERO
+			_joy_draw.active = false
+			_joy_draw.queue_redraw()
+		return
 	var outcome: Dictionary = _spells.activate(kind, e_px, e_pz)
 	if outcome.is_empty():
 		return
-	var hits: int = int(outcome["hits"])
-	if kind == "meteor":
-		var center: Vector2 = outcome["center"]
-		var damage: float = outcome["damage"]
-		for idx in outcome["indices"]:
-			_damage_enemy(int(idx), damage)
-		_burst(Vector3(center.x, 0.7, center.y), 1, 28, 5.0, 5.0)
-		_burst(Vector3(center.x, 0.7, center.y), 2, 12, 3.5, 5.0)
-		_shake = maxf(_shake, 0.18)
-		_snd("boom", 0.8)
-		_vibrate(45)
-	else:
-		_burst(_hero.position + Vector3(0, 1.0, 0), 2, 12, 3.5, 3.5)
-		_snd("build", 1.6)
-		_vibrate(25)
-	Report.ev(_play_time, "spell_cast", "type=%s affected=%d level=%d" % [kind, hits, level + 1])
+	_burst(_hero.position + Vector3(0, 1.0, 0), 2, 12, 3.5, 3.5)
+	_snd("build", 1.6)
+	_vibrate(25)
+	Report.ev(_play_time, "spell_cast", "type=%s affected=%d level=%d" % [kind, int(outcome["hits"]), level + 1])
+
+
+func _on_meteor_cancelled() -> void:
+	_meteor_touch_id = -1
+	if _meteor_fx != null:
+		_meteor_fx.hide_target()
+
+
+func _target_from_screen(screen: Vector2) -> Vector3:
+	var origin: Vector3 = _camera.project_ray_origin(screen)
+	var direction: Vector3 = _camera.project_ray_normal(screen)
+	var hit: Variant = Plane(Vector3.UP, 0.0).intersects_ray(origin, direction)
+	if hit == null:
+		return Vector3(0.0, -100.0, 0.0)
+	var point: Vector3 = hit
+	if absf(point.x) > BOUNDS.x or absf(point.z) > BOUNDS.y:
+		return Vector3(0.0, -100.0, 0.0)
+	return point
+
+
+func _confirm_meteor(world: Vector3) -> void:
+	if world.y < -1.0 or _paused or _over or _autoplay:
+		return
+	if not _spells.confirm_meteor():
+		return
+	_meteor_fx.launch(world)
+	_snd("spawn", 1.5)
+	_vibrate(18)
+
+
+func _on_meteor_impact(world: Vector3) -> void:
+	var hits := 0
+	var radius2: float = Spells.METEOR_RADIUS * Spells.METEOR_RADIUS
+	for i in e_id.size():
+		var dx: float = e_px[i] - world.x
+		var dz: float = e_pz[i] - world.z
+		if dx * dx + dz * dz <= radius2:
+			_damage_enemy(i, Spells.METEOR_DAMAGE)
+			hits += 1
+	_burst(world + Vector3(0, 0.7, 0), 1, 28, 5.0, 5.0)
+	_burst(world + Vector3(0, 0.7, 0), 2, 12, 3.5, 5.0)
+	_shake = maxf(_shake, 0.28)
+	_snd("boom", 0.8)
+	_vibrate(45)
+	Report.ev(_play_time, "spell_cast", "type=meteor affected=%d level=%d" % [hits, level + 1])
 
 
 func _report_end(result: String) -> void:
@@ -1040,6 +1093,7 @@ func _toggle_pause() -> void:
 		return
 	_paused = not _paused
 	if _paused:
+		_spells.cancel_targeting()
 		_pause_count += 1
 		Report.ev(_play_time, "pause", "")
 		_show_overlay("pause")
@@ -1061,6 +1115,32 @@ func _notification(what: int) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _paused or _over:
+		return
+	if _spells != null and _spells.is_targeting():
+		if event is InputEventScreenTouch:
+			if event.pressed and _meteor_touch_id == -1:
+				var pos: Vector3 = _target_from_screen(event.position)
+				if pos.y > -1.0:
+					_meteor_touch_id = event.index
+					_meteor_touch_point = pos
+					_meteor_fx.show_target(pos)
+			elif not event.pressed and event.index == _meteor_touch_id:
+				_meteor_touch_id = -1
+				_confirm_meteor(_meteor_touch_point)
+		elif event is InputEventScreenDrag and event.index == _meteor_touch_id:
+			var pos: Vector3 = _target_from_screen(event.position)
+			if pos.y > -1.0:
+				_meteor_touch_point = pos
+				_meteor_fx.show_target(pos)
+		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			var pos: Vector3 = _target_from_screen(event.position)
+			if pos.y > -1.0:
+				_confirm_meteor(pos)
+		elif event is InputEventMouseMotion:
+			var pos: Vector3 = _target_from_screen(event.position)
+			if pos.y > -1.0:
+				_meteor_fx.show_target(pos)
+		get_viewport().set_input_as_handled()
 		return
 	if event is InputEventScreenTouch:
 		if event.pressed and _joy_id == -1:
@@ -1178,6 +1258,7 @@ func _step(delta: float) -> void:
 	if not _autoplay:
 		_boosts.tick(delta, _hero.position)
 		_spells.tick(delta)
+		_meteor_fx.tick(delta)
 	_update_hero(delta)
 	_update_enemies(delta)
 	_update_allies(delta)
@@ -1251,6 +1332,7 @@ func _finish(won: bool) -> void:
 	if _over:
 		return
 	_over = true
+	_spells.cancel_targeting()
 	_spells.visible = false
 	_stars_earned = 0
 	if won:
