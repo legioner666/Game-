@@ -1,0 +1,39 @@
+name: Playtest (bot + screenshots)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, "gpt/**", "claude/**"]
+    paths:
+      - "godot/**"
+      - "playtest/**"
+
+permissions:
+  contents: write
+
+jobs:
+  playtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: chickensoft-games/setup-godot@v2
+        with:
+          version: "4.4.1"
+          use-dotnet: false
+      - name: Install xvfb and mesa
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libglu1-mesa
+      - name: Run bot and take screenshots
+        run: playtest/run.sh out
+      - name: Publish results to branch playtest/<ref>
+        run: |
+          BR="playtest/$(echo "$GITHUB_REF_NAME" | tr '/' '-')"
+          cd out
+          {
+            echo "# Playtest $GITHUB_REF_NAME @ $GITHUB_SHA"
+            echo; echo "Звіт бота: bot_report.txt. Знімки: L<рівень>_<секунда>.png"
+          } > README.md
+          git init -q && git checkout -q -b "$BR"
+          git config user.name "playtest-bot" && git config user.email "bot@users.noreply.github.com"
+          git add -A && git commit -q -m "playtest $GITHUB_SHA"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "$BR"
