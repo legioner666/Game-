@@ -132,59 +132,119 @@ static func no_shadow(n: GeometryInstance3D) -> void:
 # ---------- Рої: вороги ----------
 
 static func grunt_mesh() -> ArrayMesh:
+	var skin := Color(0.45, 0.68, 0.30)
+	var skin_d := Color(0.33, 0.52, 0.25)
+	var tunic := Color(0.56, 0.30, 0.18)
 	var dark := Color(0.10, 0.08, 0.08)
-	return compose([
-		part(capsule(0.27, 0.86, 7, 2), Vector3(0, 0.43, 0), RED),
-		part(box(Vector3(0.58, 0.1, 0.36)), Vector3(0, 0.5, 0), Color(0.25, 0.15, 0.1)),
-		part(sphere(0.2, 7), Vector3(0, 0.98, 0), SKIN),
-		part(box(Vector3(0.05, 0.05, 0.04)), Vector3(-0.07, 1.0, -0.17), dark),
-		part(box(Vector3(0.05, 0.05, 0.04)), Vector3(0.07, 1.0, -0.17), dark),
-		part(cyl(0.17, 0.22, 0.17, 7), Vector3(0, 1.12, 0), STONE_D),
-		part(cyl(0.0, 0.05, 0.22, 5), Vector3(-0.2, 1.22, 0), Color(0.93, 0.9, 0.8), Vector3(0, 0, 40)),
-		part(cyl(0.0, 0.05, 0.22, 5), Vector3(0.2, 1.22, 0), Color(0.93, 0.9, 0.8), Vector3(0, 0, -40)),
-		part(cyl(0.27, 0.27, 0.06, 9), Vector3(-0.36, 0.62, -0.1), WOOD, Vector3(0, 0, 90)),
-		part(sphere(0.09, 6), Vector3(-0.4, 0.62, -0.1), STONE),
-		part(box(Vector3(0.09, 0.62, 0.09)), Vector3(0.34, 0.62, -0.1), WOOD, Vector3(-30, 0, 0)),
-		part(sphere(0.12, 5), Vector3(0.34, 0.9, -0.27), STONE_D),
-	])
+	var parts: Array = []
+	for sx in [-1.0, 1.0]:
+		parts.append(part(box(Vector3(0.14, 0.38, 0.16)), Vector3(sx * 0.13, 0.19, 0), skin_d))
+		parts.append(part(box(Vector3(0.17, 0.07, 0.25)), Vector3(sx * 0.13, 0.035, -0.04), Color(0.30, 0.20, 0.12)))
+		parts.append(part(cyl(0.0, 0.07, 0.3, 5), Vector3(sx * 0.3, 1.2, 0.0), skin, Vector3(0, 0, sx * -75)))
+		parts.append(part(sphere(0.05, 5), Vector3(sx * 0.09, 1.2, -0.2), Color(1.0, 0.9, 0.2)))
+		parts.append(part(sphere(0.022, 4), Vector3(sx * 0.09, 1.2, -0.245), dark))
+		parts.append(part(capsule(0.07, 0.5, 6, 2), Vector3(sx * 0.34, 0.75, -0.05), skin, Vector3(0, 0, sx * 14)))
+	parts.append(part(capsule(0.27, 0.62, 7, 2), Vector3(0, 0.68, 0), tunic, Vector3(-10, 0, 0)))
+	parts.append(part(box(Vector3(0.58, 0.09, 0.4)), Vector3(0, 0.55, 0), Color(0.22, 0.13, 0.08)))
+	parts.append(part(sphere(0.24, 7), Vector3(0, 1.16, -0.06), skin))
+	parts.append(part(cyl(0.0, 0.07, 0.2, 5), Vector3(0, 1.1, -0.27), skin_d, Vector3(-90, 0, 0)))
+	parts.append(part(cyl(0.19, 0.25, 0.12, 7), Vector3(0, 1.36, -0.03), Color(0.35, 0.22, 0.12)))
+	parts.append(part(box(Vector3(0.14, 0.04, 0.03)), Vector3(0, 1.04, -0.22), dark))
+	parts.append(part(cyl(0.07, 0.045, 0.55, 6), Vector3(0.4, 1.0, -0.34), WOOD, Vector3(-50, 0, 0)))
+	parts.append(part(sphere(0.12, 6), Vector3(0.4, 1.2, -0.58), STONE_D))
+	return compose(parts)
 
 
 static func runner_mesh() -> ArrayMesh:
-	var orange := Color(0.96, 0.52, 0.12)
-	var dark := Color(0.10, 0.08, 0.08)
-	return compose([
-		part(capsule(0.22, 0.74, 7, 2), Vector3(0, 0.37, 0), orange),
-		part(sphere(0.18, 7), Vector3(0, 0.84, 0), SKIN),
-		part(box(Vector3(0.05, 0.05, 0.04)), Vector3(-0.06, 0.86, -0.15), dark),
-		part(box(Vector3(0.05, 0.05, 0.04)), Vector3(0.06, 0.86, -0.15), dark),
-		part(cyl(0.0, 0.2, 0.3, 6), Vector3(0, 1.0, 0.02), RED_D),
-		part(box(Vector3(0.1, 0.06, 0.55)), Vector3(0, 0.66, 0.36), RED, Vector3(-18, 0, 0)),
-		part(box(Vector3(0.05, 0.4, 0.05)), Vector3(0.28, 0.5, -0.15), Color(0.85, 0.87, 0.92), Vector3(-60, 0, 0)),
-		part(box(Vector3(0.05, 0.4, 0.05)), Vector3(-0.28, 0.5, -0.15), Color(0.85, 0.87, 0.92), Vector3(-60, 0, 0)),
-	])
+	var fur := Color(0.55, 0.57, 0.62)
+	var fur_d := Color(0.38, 0.40, 0.46)
+	var parts: Array = []
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			parts.append(part(box(Vector3(0.1, 0.42, 0.1)), Vector3(sx * 0.13, 0.21, sz * 0.3), fur_d))
+		parts.append(part(cyl(0.0, 0.06, 0.2, 5), Vector3(sx * 0.1, 0.84, -0.52), fur_d))
+		parts.append(part(sphere(0.04, 4), Vector3(sx * 0.09, 0.66, -0.68), Color(0.95, 0.2, 0.1)))
+	parts.append(part(capsule(0.22, 0.95, 7, 2), Vector3(0, 0.52, 0), fur, Vector3(90, 0, 0)))
+	parts.append(part(sphere(0.2, 7), Vector3(0, 0.64, -0.55), fur))
+	parts.append(part(box(Vector3(0.14, 0.12, 0.24)), Vector3(0, 0.57, -0.74), fur_d))
+	parts.append(part(sphere(0.04, 4), Vector3(0, 0.6, -0.87), Color(0.08, 0.08, 0.08)))
+	parts.append(part(capsule(0.06, 0.5, 5, 2), Vector3(0, 0.62, 0.62), fur_d, Vector3(-55, 0, 0)))
+	# вершник-гоблін
+	parts.append(part(capsule(0.14, 0.4, 6, 2), Vector3(0, 0.92, 0.0), Color(0.56, 0.30, 0.18)))
+	parts.append(part(sphere(0.14, 6), Vector3(0, 1.22, -0.03), Color(0.45, 0.68, 0.30)))
+	parts.append(part(cyl(0.0, 0.14, 0.24, 6), Vector3(0, 1.4, -0.02), RED_D))
+	parts.append(part(box(Vector3(0.04, 0.4, 0.04)), Vector3(0.22, 1.0, -0.2), Color(0.85, 0.87, 0.92), Vector3(-40, 0, 0)))
+	return compose(parts)
 
 
 static func brute_mesh() -> ArrayMesh:
+	var skin := Color(0.50, 0.60, 0.44)
+	var skin_d := Color(0.40, 0.50, 0.36)
 	var dark := Color(0.10, 0.08, 0.08)
-	return compose([
-		part(capsule(0.52, 1.7, 9, 3), Vector3(0, 0.85, 0), Color(0.78, 0.15, 0.12)),
-		part(sphere(0.45, 8), Vector3(0, 0.6, -0.18), Color(0.95, 0.62, 0.52), Vector3.ZERO, Vector3(1.0, 0.8, 0.9)),
-		part(box(Vector3(1.1, 0.14, 0.7)), Vector3(0, 0.62, 0), Color(0.25, 0.15, 0.1)),
-		part(sphere(0.31, 8), Vector3(0, 1.85, -0.05), SKIN),
-		part(box(Vector3(0.07, 0.06, 0.05)), Vector3(-0.1, 1.88, -0.32), dark),
-		part(box(Vector3(0.07, 0.06, 0.05)), Vector3(0.1, 1.88, -0.32), dark),
-		part(cyl(0.26, 0.34, 0.26, 8), Vector3(0, 2.07, -0.05), STONE_D),
-		part(cyl(0.0, 0.09, 0.4, 5), Vector3(-0.32, 2.3, -0.05), Color(0.93, 0.9, 0.8), Vector3(0, 0, 35)),
-		part(cyl(0.0, 0.09, 0.4, 5), Vector3(0.32, 2.3, -0.05), Color(0.93, 0.9, 0.8), Vector3(0, 0, -35)),
-		part(sphere(0.3, 7), Vector3(-0.62, 1.55, 0), STONE_D, Vector3.ZERO, Vector3(1.2, 0.8, 1.2)),
-		part(sphere(0.3, 7), Vector3(0.62, 1.55, 0), STONE_D, Vector3.ZERO, Vector3(1.2, 0.8, 1.2)),
-		part(capsule(0.17, 0.8, 7, 2), Vector3(-0.66, 1.15, 0), SKIN, Vector3(0, 0, 12)),
-		part(capsule(0.17, 0.8, 7, 2), Vector3(0.66, 1.15, -0.1), SKIN, Vector3(-30, 0, -12)),
-		part(box(Vector3(0.2, 1.1, 0.2)), Vector3(0.78, 1.15, -0.45), WOOD, Vector3(-35, 0, 0)),
-		part(box(Vector3(0.42, 0.42, 0.42)), Vector3(0.78, 1.62, -0.78), STONE_D, Vector3(-35, 0, 0)),
-		part(cyl(0.0, 0.07, 0.2, 5), Vector3(0.78, 1.62, -1.0), STONE, Vector3(-125, 0, 0)),
-		part(cyl(0.0, 0.07, 0.2, 5), Vector3(0.98, 1.7, -0.78), STONE, Vector3(0, 0, -90)),
-	])
+	var parts: Array = []
+	for sx in [-1.0, 1.0]:
+		parts.append(part(box(Vector3(0.3, 0.8, 0.32)), Vector3(sx * 0.3, 0.4, 0), skin_d))
+		parts.append(part(box(Vector3(0.36, 0.14, 0.5)), Vector3(sx * 0.3, 0.07, -0.08), Color(0.30, 0.22, 0.16)))
+		parts.append(part(sphere(0.3, 7), Vector3(sx * 0.8, 1.85, 0.0), STONE_D, Vector3.ZERO, Vector3(1.2, 0.8, 1.2)))
+		parts.append(part(sphere(0.05, 4), Vector3(sx * 0.12, 2.2, -0.42), Color(0.95, 0.2, 0.1)))
+		parts.append(part(cyl(0.0, 0.06, 0.22, 5), Vector3(sx * 0.15, 1.98, -0.44), Color(0.95, 0.92, 0.82)))
+	parts.append(part(sphere(0.7, 8), Vector3(0, 1.3, -0.04), skin, Vector3.ZERO, Vector3(1.0, 0.95, 0.9)))
+	parts.append(part(box(Vector3(1.0, 0.16, 0.8)), Vector3(0, 0.98, 0), Color(0.30, 0.20, 0.12)))
+	parts.append(part(box(Vector3(0.9, 0.5, 0.14)), Vector3(0, 1.7, -0.5), STONE_D, Vector3(-10, 0, 0)))
+	parts.append(part(sphere(0.3, 7), Vector3(0, 2.15, -0.2), skin))
+	parts.append(part(box(Vector3(0.3, 0.07, 0.06)), Vector3(0, 2.0, -0.46), dark))
+	parts.append(part(capsule(0.2, 1.0, 6, 2), Vector3(-0.88, 1.3, -0.05), skin, Vector3(0, 0, 8)))
+	parts.append(part(capsule(0.2, 1.0, 6, 2), Vector3(0.88, 1.35, -0.2), skin, Vector3(-35, 0, -8)))
+	parts.append(part(box(Vector3(0.18, 1.3, 0.18)), Vector3(0.95, 1.5, -0.7), WOOD, Vector3(-40, 0, 0)))
+	parts.append(part(box(Vector3(0.5, 0.5, 0.5)), Vector3(0.95, 2.15, -1.2), STONE_D, Vector3(-40, 0, 0)))
+	parts.append(part(cyl(0.0, 0.08, 0.24, 5), Vector3(0.95, 2.2, -1.5), STONE, Vector3(-130, 0, 0)))
+	parts.append(part(cyl(0.0, 0.08, 0.24, 5), Vector3(1.22, 2.25, -1.2), STONE, Vector3(0, 0, -90)))
+	parts.append(part(cyl(0.0, 0.08, 0.24, 5), Vector3(0.68, 2.25, -1.2), STONE, Vector3(0, 0, 90)))
+	parts.append(part(sphere(0.3, 6), Vector3(-0.92, 0.95, -0.55), STONE))
+	return compose(parts)
+
+
+const WALK_SHADER := """
+shader_type spatial;
+uniform float leg_h = 0.45;
+uniform float freq = 10.0;
+uniform float amp = 0.2;
+uniform float lift = 0.08;
+uniform bool quad = false;
+void vertex() {
+	vec3 o = MODEL_MATRIX[3].xyz;
+	float ph = o.x * 1.9 + o.z * 2.7;
+	float k = clamp(1.0 - VERTEX.y / leg_h, 0.0, 1.0);
+	float side = sign(VERTEX.x);
+	if (quad) {
+		side = side * (VERTEX.z < 0.0 ? 1.0 : -1.0);
+	}
+	float w = sin(TIME * freq + ph + (side > 0.0 ? 3.14159 : 0.0));
+	VERTEX.z += w * amp * k;
+	VERTEX.y += max(w, 0.0) * lift * k;
+}
+void fragment() {
+	ALBEDO = COLOR.rgb;
+	ROUGHNESS = 0.9;
+}
+"""
+
+
+## Матеріал з анімацією ходьби ніг у вершинному шейдері: безкоштовно для сотень ворогів.
+static func walk_material(leg_h: float, freq: float, amp: float, lift: float, quad: bool) -> ShaderMaterial:
+	var key := "walk_%s_%s_%s_%s_%s" % [leg_h, freq, amp, lift, quad]
+	if not _mats.has(key):
+		var sh := Shader.new()
+		sh.code = WALK_SHADER
+		var m := ShaderMaterial.new()
+		m.shader = sh
+		m.set_shader_parameter("leg_h", leg_h)
+		m.set_shader_parameter("freq", freq)
+		m.set_shader_parameter("amp", amp)
+		m.set_shader_parameter("lift", lift)
+		m.set_shader_parameter("quad", quad)
+		_mats[key] = m
+	return _mats[key]
 
 
 static func ally_mesh() -> ArrayMesh:
