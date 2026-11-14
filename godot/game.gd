@@ -16,6 +16,7 @@ var sfx: Node
 # ---------- Налаштування світу ----------
 
 const STEP := 0.25
+const YAW_WINDOW := 7
 const WAYPOINTS: Array[Vector3] = [
 	Vector3(7, 0, -17), Vector3(7, 0, -11), Vector3(-7, 0, -8), Vector3(-7, 0, -2),
 	Vector3(7, 0, 1), Vector3(7, 0, 7), Vector3(-4, 0, 10), Vector3(-4, 0, 15),
@@ -209,6 +210,7 @@ class Ally:
 	var swing := 0.0
 	var hurt := 0.0
 	var plate: Plate
+	var walk := 0.0
 	var phase := 0.0
 
 
@@ -320,6 +322,9 @@ var _fps_sum := 0.0
 var _fps_n := 0
 var _fps_min := 999.0
 var _fps_t := 0.0
+var _frame_max := 0.0
+var _slow_frames := 0
+var _frames := 0
 
 # батчі
 var _b_enemy: Array = []
@@ -410,8 +415,32 @@ func _build_path() -> void:
 	pts.append(WAYPOINTS[WAYPOINTS.size() - 1])
 	yaws.append(yaws[yaws.size() - 1])
 	_samples = pts
-	_yaws = yaws
+	# згладжуємо кут повороту вздовж стежки, щоб на кутах вороги повертались плавно
+	var sm := PackedFloat32Array()
+	sm.resize(yaws.size())
+	for i in yaws.size():
+		var sx := 0.0
+		var sz := 0.0
+		for j in range(maxi(0, i - YAW_WINDOW), mini(yaws.size() - 1, i + YAW_WINDOW) + 1):
+			sx += sin(yaws[j])
+			sz += cos(yaws[j])
+		sm[i] = atan2(sx, sz)
+	_yaws = sm
 	_total = (pts.size() - 1) * STEP
+
+
+func _path_pos(d: float) -> Vector3:
+	var f := maxf(d, 0.0) / STEP
+	var i := mini(int(f), _samples.size() - 1)
+	var j := mini(i + 1, _samples.size() - 1)
+	return _samples[i].lerp(_samples[j], f - float(i))
+
+
+func _path_yaw(d: float) -> float:
+	var f := maxf(d, 0.0) / STEP
+	var i := mini(int(f), _yaws.size() - 1)
+	var j := mini(i + 1, _yaws.size() - 1)
+	return lerp_angle(_yaws[i], _yaws[j], f - float(i))
 
 
 func _dist_to_path(p: Vector3) -> float:
@@ -841,7 +870,7 @@ func _show_overlay(kind: String) -> void:
 
 func _report_end(result: String) -> void:
 	var fps_avg := _fps_sum / maxf(1.0, float(_fps_n))
-	Report.ev(_play_time, "summary", "result=%s wave=%d base=%d collected=%d spent=%d lost_on_ground=%d leaked=%d pauses=%d fps_avg=%.0f fps_min=%.0f" % [result, _wave + 1, _base_hp, _total_collected, _spent, _lost_coins, _leaks_total, _pause_count, fps_avg, minf(_fps_min, fps_avg)])
+	Report.ev(_play_time, "summary", "result=%s wave=%d base=%d collected=%d spent=%d lost_on_ground=%d leaked=%d pauses=%d fps_avg=%.0f fps_min=%.0f worst_frame_ms=%.0f frames_over_25ms=%d/%d" % [result, _wave + 1, _base_hp, _total_collected, _spent, _lost_coins, _leaks_total, _pause_count, fps_avg, minf(_fps_min, fps_avg), _frame_max * 1000.0, _slow_frames, _frames])
 	Report.end_run(result)
 
 
@@ -954,6 +983,11 @@ func _process(delta: float) -> void:
 		_render_all(delta)
 		_check_shots()
 		return
+	_frames += 1
+	if _play_time > 2.0:
+		_frame_max = maxf(_frame_max, delta)
+		if delta > 0.025:
+			_slow_frames += 1
 	_fps_t += delta
 	if _fps_t >= 1.0:
 		_fps_t = 0.0
@@ -1125,7 +1159,6 @@ func _remove_enemy(i: int) -> void:
 
 func _update_enemies(delta: float) -> void:
 	var n := e_id.size()
-	var last_idx := _samples.size() - 1
 	for i in n:
 		var spd := e_spd[i]
 		var slow := e_slow[i]
@@ -1134,7 +1167,7 @@ func _update_enemies(delta: float) -> void:
 			e_slow[i] = slow - delta
 		var d := e_dist[i] + spd * delta
 		e_dist[i] = d
-		var sp := _samples[mini(int(d / STEP), last_idx)]
+		var sp := _path_pos(d)
 		var px := sp.x + e_ox[i]
 		var pz := sp.z + e_oz[i]
 		e_px[i] = px
@@ -1297,7 +1330,7 @@ func _spawn_ball(from: Vector3, tgt: int, dmg: float, aoe: float) -> void:
 	var dur := clampf(from.distance_to(dest) / 13.0, 0.45, 1.0)
 	var ahead := e_dist[tgt] + e_spd[tgt] * dur
 	if ahead < _total:
-		var sp := _samples[mini(int(ahead / STEP), _samples.size() - 1)]
+		var sp := _path_pos(ahead)
 		dest = Vector3(sp.x + e_ox[tgt], 0.0, sp.z + e_oz[tgt])
 	var b := Ball.new()
 	b.start = from
@@ -1431,7 +1464,9 @@ func _update_allies(delta: float) -> void:
 		to.y = 0.0
 		var dist := to.length()
 		var stop := 0.8 if engaged else 0.2
-		if dist > stop:
+		var moving := dist > stop
+		a.walk = move_toward(a.walk, 1.0 if moving else 0.0, delta * 6.0)
+		if moving:
 			a.pos += to / dist * minf(ALLY_SPEED * delta, dist - stop * 0.5)
 			a.yaw = lerp_angle(a.yaw, atan2(-to.x, -to.z), 1.0 - exp(-12.0 * delta))
 		if engaged and dist < 1.25 and a.cd <= 0.0:
@@ -1659,11 +1694,10 @@ func _render_enemies() -> void:
 	var toward_cam := Vector3(0, 0.82, 0.57)
 	for i in e_id.size():
 		var t := e_type[i]
-		var idx := mini(int(e_dist[i] / STEP), _samples.size() - 1)
 		var bob := absf(sin(_time * 9.0 + e_ph[i]))
 		var sc: float = E_SCALE[t]
 		var pos := Vector3(e_px[i], bob * 0.1, e_pz[i])
-		_b_enemy[t].add(pos, _yaws[idx], sc, sc * (1.0 + bob * 0.07), sc)
+		_b_enemy[t].add(pos, _path_yaw(e_dist[i]), sc, sc * (1.0 + bob * 0.07), sc)
 		if t == 2:
 			var ratio := clampf(e_hp[i] / float(E_HP[2]), 0.0, 1.0)
 			var bp := Vector3(e_px[i] - 0.75, 2.9, e_pz[i]) + toward_cam * 0.5
@@ -1678,7 +1712,7 @@ func _render_enemies() -> void:
 func _render_allies() -> void:
 	_b_ally.begin()
 	for a in _allies:
-		var bob := absf(sin(_time * 10.0 + a.phase)) * 0.08
+		var bob: float = absf(sin(_time * 10.0 + a.phase)) * 0.08 * a.walk
 		var sy: float = 1.0 + a.swing * 0.12
 		_b_ally.add(a.pos + Vector3(0, bob, 0), a.yaw, 1.0 + a.hurt * 0.4, sy, 1.0 + a.swing * 0.15)
 	_b_ally.end()
