@@ -18,13 +18,6 @@ var sfx: Node
 
 const STEP := 0.25
 const YAW_WINDOW := 7
-const WAYPOINTS: Array[Vector3] = [
-	Vector3(7, 0, -17), Vector3(7, 0, -11), Vector3(-7, 0, -8), Vector3(-7, 0, -2),
-	Vector3(7, 0, 1), Vector3(7, 0, 7), Vector3(-4, 0, 10), Vector3(-4, 0, 15),
-]
-const BASE_POS := Vector3(-4.0, 0.0, 17.8)
-const RALLY := Vector3(-4.0, 0.0, 12.3)
-const HERO_START := Vector3(5.0, 0.0, 16.0)
 const BOUNDS := Vector2(11.5, 20.0)
 const CAM_OFFSET := Vector3(0, 23, 16)
 const CAM_Z_MIN := -6.0
@@ -69,15 +62,6 @@ const KIND := {
 	"cannon": {"cost": [40, 60, 90], "range": [8.5, 9.0, 9.5], "dmg": [40.0, 65.0, 100.0], "cd": [2.2, 2.0, 1.8], "aoe": [2.0, 2.3, 2.6]},
 	"barracks": {"cost": [30, 45, 65], "cap": [3, 4, 6], "dmg": [8.0, 11.0, 15.0], "hp": [40.0, 60.0, 90.0]},
 }
-const PLATE_DEFS := [
-	{"kind": "crossbow", "pos": Vector3(-3, 0, -6)},
-	{"kind": "crossbow", "pos": Vector3(3, 0, -6)},
-	{"kind": "cannon", "pos": Vector3(-3, 0, 4)},
-	{"kind": "crossbow", "pos": Vector3(3, 0, 4)},
-	{"kind": "barracks", "pos": Vector3(1.5, 0, 12.8)},
-	{"kind": "crossbow", "pos": Vector3(3, 0, -13), "min_level": 1},
-	{"kind": "cannon", "pos": Vector3(-6.5, 0, 6.5), "min_level": 1},
-]
 # Група: [тип, кількість, старт (с), інтервал (с)]
 const LEVEL_MULT := [1.0, 3.0, 4.2]
 const LEVEL_START_MULT := [1.0, 1.3, 1.35]
@@ -311,6 +295,12 @@ var _cam_z := 0.0
 var level := 0
 var _waves: Array = []
 var _stars_earned := 0
+var _wp: Array[Vector3] = []
+var _base_pos := Vector3.ZERO
+var _rally := Vector3.ZERO
+var _hero_start := Vector3.ZERO
+var _plate_defs: Array = []
+var _theme: Dictionary = {}
 var _run_id := 0
 var _wave := 0
 var _phase := 0  # 0 — пауза між хвилями, 1 — хвиля йде
@@ -384,6 +374,7 @@ var _bot_log_t := 0.0
 func _ready() -> void:
 	randomize()
 	_parse_args()
+	_load_level()
 	_waves = _make_waves(clampi(level, 0, LEVEL_MULT.size() - 1))
 	_carried = LEVEL_START[clampi(level, 0, LEVEL_START.size() - 1)]
 	_build_path()
@@ -419,6 +410,15 @@ func _parse_args() -> void:
 
 # ---------- Стежка ----------
 
+func _load_level() -> void:
+	var d := Levels.data(clampi(level, 0, Settings.LEVEL_COUNT - 1))
+	_wp.assign(d["waypoints"])
+	_base_pos = d["base_pos"]
+	_hero_start = d["hero_start"]
+	_plate_defs = d["plates"]
+	_theme = d["theme"]
+
+
 func _make_waves(lv: int) -> Array:
 	var m: float = LEVEL_MULT[lv]
 	var out: Array = []
@@ -441,16 +441,16 @@ func _make_waves(lv: int) -> Array:
 func _build_path() -> void:
 	var pts := PackedVector3Array()
 	var yaws := PackedFloat32Array()
-	for i in WAYPOINTS.size() - 1:
-		var a := WAYPOINTS[i]
-		var b := WAYPOINTS[i + 1]
+	for i in _wp.size() - 1:
+		var a := _wp[i]
+		var b := _wp[i + 1]
 		var n := maxi(1, int(a.distance_to(b) / STEP))
 		var dir := (b - a).normalized()
 		var yaw := atan2(-dir.x, -dir.z)
 		for k in n:
 			pts.append(a.lerp(b, float(k) / n))
 			yaws.append(yaw)
-	pts.append(WAYPOINTS[WAYPOINTS.size() - 1])
+	pts.append(_wp[_wp.size() - 1])
 	yaws.append(yaws[yaws.size() - 1])
 	_samples = pts
 	# згладжуємо кут повороту вздовж стежки, щоб на кутах вороги повертались плавно
@@ -465,6 +465,7 @@ func _build_path() -> void:
 		sm[i] = atan2(sx, sz)
 	_yaws = sm
 	_total = (pts.size() - 1) * STEP
+	_rally = _path_pos(_total - 2.7)
 
 
 func _path_pos(d: float) -> Vector3:
@@ -483,9 +484,9 @@ func _path_yaw(d: float) -> float:
 
 func _dist_to_path(p: Vector3) -> float:
 	var best := 1e9
-	for i in WAYPOINTS.size() - 1:
-		var a := WAYPOINTS[i]
-		var ab := WAYPOINTS[i + 1] - a
+	for i in _wp.size() - 1:
+		var a := _wp[i]
+		var ab := _wp[i + 1] - a
 		var t := clampf((p - a).dot(ab) / ab.length_squared(), 0.0, 1.0)
 		best = minf(best, p.distance_to(a + ab * t))
 	return best
@@ -496,9 +497,9 @@ func _dist_to_path(p: Vector3) -> float:
 func _build_world() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.70, 0.82, 0.88)
+	env.background_color = _theme["bg"]
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.86, 0.83, 0.80)
+	env.ambient_light_color = _theme["ambient"]
 	env.ambient_light_energy = 0.45
 	var we := WorldEnvironment.new()
 	we.environment = env
@@ -515,20 +516,20 @@ func _build_world() -> void:
 	_camera.keep_aspect = Camera3D.KEEP_WIDTH
 	_camera.fov = CAM_FOV
 	add_child(_camera)
-	_cam_x = clampf(HERO_START.x, -CAM_X_LIMIT, CAM_X_LIMIT)
-	_cam_z = clampf(HERO_START.z, CAM_Z_MIN, CAM_Z_MAX)
+	_cam_x = clampf(_hero_start.x, -CAM_X_LIMIT, CAM_X_LIMIT)
+	_cam_z = clampf(_hero_start.z, CAM_Z_MIN, CAM_Z_MAX)
 	_camera.position = Vector3(_cam_x, 0, _cam_z) + CAM_OFFSET
 	_camera.look_at(Vector3(_cam_x, 0, _cam_z))
 
 	# земля, стежка
-	var ground := Models.mi(Models.box(Vector3(160, 0.2, 160)), Vector3(0, -0.1, 0), Color(0.47, 0.65, 0.47))
+	var ground := Models.mi(Models.box(Vector3(160, 0.2, 160)), Vector3(0, -0.1, 0), _theme["ground"])
 	Models.no_shadow(ground)
 	add_child(ground)
-	var rim_c := Color(0.66, 0.50, 0.35)
-	var sand_c := Color(0.84, 0.71, 0.55)
-	for i in WAYPOINTS.size() - 1:
-		var a := WAYPOINTS[i]
-		var b := WAYPOINTS[i + 1]
+	var rim_c: Color = _theme["rim"]
+	var sand_c: Color = _theme["sand"]
+	for i in _wp.size() - 1:
+		var a := _wp[i]
+		var b := _wp[i + 1]
 		var dir := (b - a).normalized()
 		var yaw := atan2(-dir.x, -dir.z)
 		var mid := (a + b) * 0.5
@@ -540,7 +541,7 @@ func _build_world() -> void:
 		Models.no_shadow(sand)
 		add_child(rim)
 		add_child(sand)
-	for w in WAYPOINTS:
+	for w in _wp:
 		var rimp := Models.mi(Models.cyl(1.6, 1.6, 0.04, 14), w, rim_c)
 		var sandp := Models.mi(Models.cyl(1.3, 1.3, 0.06, 14), w + Vector3(0, 0.02, 0), sand_c)
 		Models.no_shadow(rimp)
@@ -550,7 +551,7 @@ func _build_world() -> void:
 
 	# замок
 	_castle = Models.castle()
-	_castle.position = BASE_POS
+	_castle.position = _base_pos
 	add_child(_castle)
 
 	_build_decor()
@@ -559,13 +560,19 @@ func _build_world() -> void:
 func _build_decor() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 11
-	var trees := Batch.new(self, Models.tree_mesh(), 90)
-	var rtrees := Batch.new(self, Models.round_tree_mesh(), 60)
-	var rocks := Batch.new(self, Models.rock_mesh(), 40)
+	var t: Dictionary = _theme
+	var trees := Batch.new(self, Models.theme_mesh(t["tree_a"]), 90)
+	var rtrees := Batch.new(self, Models.theme_mesh(t["tree_b"]), 60)
+	var rocks := Batch.new(self, Models.rock_mesh(), 60)
 	var bushes := Batch.new(self, Models.bush_mesh(), 60)
 	var flowers := Batch.new(self, Models.flower_mesh(), 90)
-	var tufts := Batch.new(self, Models.tuft_mesh(), 200)
+	var tufts := Batch.new(self, Models.theme_mesh(t["tuft"]), 200)
 	var pebbles := Batch.new(self, Models.pebble_mesh(), 120)
+	var want_t: int = t["trees"]
+	var want_r: int = t["rocks"]
+	var want_s: int = t["bushes"]
+	var want_f: int = t["flowers"]
+	var want_u: int = t["tufts"]
 	for b in [trees, rtrees, rocks, bushes, flowers, tufts, pebbles]:
 		b.begin()
 	var tries := 0
@@ -574,16 +581,16 @@ func _build_decor() -> void:
 	var placed_s := 0
 	var placed_f := 0
 	var placed_u := 0
-	while tries < 2200 and (placed_t < 70 or placed_r < 26 or placed_s < 36 or placed_f < 50 or placed_u < 140):
+	while tries < 2400 and (placed_t < want_t or placed_r < want_r or placed_s < want_s or placed_f < want_f or placed_u < want_u):
 		tries += 1
 		var p := Vector3(rng.randf_range(-17.0, 17.0), 0.0, rng.randf_range(-27.0, 27.0))
 		var dpath := _dist_to_path(p)
 		if dpath < 1.9:
 			continue
-		if p.distance_to(BASE_POS) < 5.0 or p.distance_to(HERO_START) < 2.5:
+		if p.distance_to(_base_pos) < 5.0 or p.distance_to(_hero_start) < 2.5:
 			continue
 		var near_plate := false
-		for d in PLATE_DEFS:
+		for d in _plate_defs:
 			var pp: Vector3 = d["pos"]
 			if p.distance_to(pp) < 3.0:
 				near_plate = true
@@ -591,23 +598,23 @@ func _build_decor() -> void:
 		if near_plate:
 			continue
 		var roll := rng.randf()
-		if roll < 0.28 and placed_t < 70 and dpath > 3.2:
+		if roll < 0.28 and placed_t < want_t and dpath > 3.2:
 			var s := rng.randf_range(0.8, 1.35)
 			(trees if rng.randf() < 0.6 else rtrees).add(p, rng.randf() * TAU, s, s * rng.randf_range(0.9, 1.2), s)
 			placed_t += 1
-		elif roll < 0.38 and placed_r < 26 and dpath > 3.2:
+		elif roll < 0.38 and placed_r < want_r and dpath > 3.2:
 			var s2 := rng.randf_range(0.7, 1.4)
 			rocks.add(p, rng.randf() * TAU, s2, s2, s2)
 			placed_r += 1
-		elif roll < 0.52 and placed_s < 36:
+		elif roll < 0.52 and placed_s < want_s:
 			var s3 := rng.randf_range(0.8, 1.3)
 			bushes.add(p, rng.randf() * TAU, s3, s3, s3)
 			placed_s += 1
-		elif roll < 0.68 and placed_f < 50:
+		elif roll < 0.68 and placed_f < want_f:
 			var s4 := rng.randf_range(0.9, 1.4)
 			flowers.add(p, rng.randf() * TAU, s4, s4, s4)
 			placed_f += 1
-		elif placed_u < 140:
+		elif placed_u < want_u:
 			var s5 := rng.randf_range(0.8, 1.5)
 			tufts.add(p, rng.randf() * TAU, s5, s5, s5)
 			placed_u += 1
@@ -620,7 +627,7 @@ func _build_decor() -> void:
 			var ang := _yaws[mini(k, _yaws.size() - 1)]
 			var nrm := Vector3(cos(ang), 0, -sin(ang)) * side
 			var pp2 := sp + nrm * rng.randf_range(1.55, 1.95)
-			if pp2.distance_to(BASE_POS) > 4.0:
+			if pp2.distance_to(_base_pos) > 4.0:
 				var s6 := rng.randf_range(0.7, 1.3)
 				pebbles.add(pp2, rng.randf() * TAU, s6, s6, s6)
 		k += 1
@@ -668,7 +675,7 @@ func _bar_material(c: Color) -> StandardMaterial3D:
 func _build_hero() -> void:
 	_hero = Models.hero()
 	_hero.scale = Vector3.ONE * 1.2
-	_hero.position = HERO_START
+	_hero.position = _hero_start
 	add_child(_hero)
 	_stack_label = Label3D.new()
 	_stack_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -682,9 +689,7 @@ func _build_hero() -> void:
 
 
 func _build_plates() -> void:
-	for def in PLATE_DEFS:
-		if level < int(def.get("min_level", 0)):
-			continue
+	for def in _plate_defs:
 		var p := Plate.new()
 		p.kind = def["kind"]
 		p.pos = def["pos"]
@@ -733,7 +738,7 @@ func _build_plates() -> void:
 
 func _rebuild_obstacles() -> void:
 	_obstacles.clear()
-	_obstacles.append([BASE_POS, 2.4])
+	_obstacles.append([_base_pos, 2.4])
 	for p in _plates:
 		if p.level > 0:
 			_obstacles.append([p.pos, 1.0 if p.kind != "barracks" else 1.4])
@@ -1351,7 +1356,7 @@ func _hit_base(dmg: int) -> void:
 	_shake = 0.6
 	_snd("hit")
 	_vibrate(40)
-	_burst(BASE_POS + Vector3(0, 1.0, 2.0), 1, 8, 3.0, 3.0)
+	_burst(_base_pos + Vector3(0, 1.0, 2.0), 1, 8, 3.0, 3.0)
 	_castle.scale = Vector3(1.06, 0.94, 1.06)
 	var tw := create_tween()
 	tw.tween_property(_castle, "scale", Vector3.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -1547,7 +1552,7 @@ func _update_barracks(p: Plate, delta: float) -> void:
 			a.pos = p.pos + Vector3(0, 0, 1.4)
 			a.max_hp = KIND["barracks"]["hp"][li]
 			a.hp = a.max_hp
-			a.home = RALLY + Vector3(randf_range(-1.3, 1.3), 0.0, randf_range(-1.0, 1.0))
+			a.home = _rally + Vector3(randf_range(-1.3, 1.3), 0.0, randf_range(-1.0, 1.0))
 			a.phase = randf() * TAU
 			_allies.append(a)
 			_burst(a.pos + Vector3(0, 0.5, 0), 1, 5, 2.0, 2.0)

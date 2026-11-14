@@ -6,6 +6,9 @@ const Settings = preload("res://settings.gd")
 const STR := {
 	"title": {"uk": "CROWN RUSH", "en": "CROWN RUSH"},
 	"tagline": {"uk": "Золото — у вежі. Фортеця — під захистом.", "en": "Turn gold into towers. Hold the keep."},
+	"level_meadow": {"uk": "Галявина", "en": "Meadow"},
+	"level_desert": {"uk": "Пустеля", "en": "Desert"},
+	"level_snow": {"uk": "Крижана долина", "en": "Frozen Valley"},
 	"level": {"uk": "Рівень %d", "en": "Level %d"},
 	"next_level": {"uk": "Наступний рівень", "en": "Next level"},
 	"choose_level": {"uk": "Обери рівень", "en": "Choose level"},

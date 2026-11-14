@@ -205,7 +205,7 @@ func _build_levels(box: VBoxContainer) -> void:
 		var row := Control.new()
 		row.custom_minimum_size = Vector2(0, 190)
 		box.add_child(row)
-		var b := _button(I18n.t("level") % (lv + 1), Color("#E8B547") if open else Color("#3a4650"), 190, 72)
+		var b := _button((I18n.t("level") % (lv + 1)) + " · " + I18n.t(Levels.data(lv)["name"]), Color("#E8B547") if open else Color("#3a4650"), 190, 72)
 		b.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		b.disabled = not open
 		var l := lv

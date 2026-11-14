@@ -238,6 +238,55 @@ static func tree_mesh() -> ArrayMesh:
 	])
 
 
+static func snow_pine_mesh() -> ArrayMesh:
+	return compose([
+		part(cyl(0.12, 0.17, 0.8, 6), Vector3(0, 0.4, 0), WOOD),
+		part(cyl(0.0, 0.85, 1.5, 7), Vector3(0, 1.45, 0), Color(0.24, 0.42, 0.40)),
+		part(cyl(0.0, 0.62, 1.2, 7), Vector3(0, 2.2, 0), Color(0.30, 0.50, 0.46)),
+		part(cyl(0.0, 0.5, 0.55, 7), Vector3(0, 2.4, 0), Color(0.95, 0.97, 1.0)),
+		part(cyl(0.0, 0.72, 0.5, 7), Vector3(0, 1.85, 0), Color(0.93, 0.96, 1.0)),
+	])
+
+
+static func cactus_mesh() -> ArrayMesh:
+	var g := Color(0.36, 0.60, 0.38)
+	var g2 := Color(0.30, 0.52, 0.34)
+	return compose([
+		part(capsule(0.24, 1.7, 7, 2), Vector3(0, 0.85, 0), g),
+		part(capsule(0.15, 0.75, 6, 2), Vector3(0.42, 0.85, 0), g2, Vector3(0, 0, 0)),
+		part(box(Vector3(0.3, 0.14, 0.14)), Vector3(0.28, 0.62, 0), g2),
+		part(capsule(0.15, 0.6, 6, 2), Vector3(-0.4, 1.1, 0), g2),
+		part(box(Vector3(0.3, 0.14, 0.14)), Vector3(-0.26, 0.9, 0), g2),
+		part(sphere(0.07, 4), Vector3(0, 1.75, 0), Color(0.95, 0.55, 0.65)),
+	])
+
+
+static func dry_tuft_mesh() -> ArrayMesh:
+	var g1 := Color(0.76, 0.66, 0.38)
+	var g2 := Color(0.66, 0.56, 0.32)
+	return compose([
+		part(cyl(0.0, 0.05, 0.34, 4), Vector3(0, 0.17, 0), g1, Vector3(0, 0, 8)),
+		part(cyl(0.0, 0.05, 0.28, 4), Vector3(0.1, 0.14, 0.04), g2, Vector3(10, 0, -14)),
+		part(cyl(0.0, 0.05, 0.26, 4), Vector3(-0.1, 0.13, -0.03), g2, Vector3(-8, 0, 16)),
+	])
+
+
+static func theme_mesh(name: String) -> ArrayMesh:
+	match name:
+		"round":
+			return round_tree_mesh()
+		"snow_pine":
+			return snow_pine_mesh()
+		"cactus":
+			return cactus_mesh()
+		"dry_tuft":
+			return dry_tuft_mesh()
+		"tuft":
+			return tuft_mesh()
+		_:
+			return tree_mesh()
+
+
 static func round_tree_mesh() -> ArrayMesh:
 	return compose([
 		part(cyl(0.13, 0.19, 0.9, 6), Vector3(0, 0.45, 0), WOOD),
