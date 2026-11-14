@@ -11,6 +11,8 @@ signal next_level
 const Models = preload("res://models.gd")
 const I18n = preload("res://i18n.gd")
 const Settings = preload("res://settings.gd")
+const Boosts = preload("res://boosts.gd")
+const Spells = preload("res://spells.gd")
 
 var sfx: Node
 
@@ -340,6 +342,8 @@ var _b_ball: Batch
 var _b_fx: Array = []
 var _b_hp_bg: Batch
 var _b_hp_fg: Batch
+var _boosts: Boosts
+var _spells: Spells
 
 # керування
 var _joy_id := -1
@@ -383,6 +387,15 @@ func _ready() -> void:
 	_build_hero()
 	_build_plates()
 	_build_ui()
+	_boosts = Boosts.new()
+	add_child(_boosts)
+	_boosts.setup_hud(_ui)
+	_boosts.picked.connect(_on_boost_picked)
+	_spells = Spells.new()
+	_ui.add_child(_spells)
+	_spells.setup(level)
+	_spells.spell_requested.connect(_on_spell_requested)
+	_spells.visible = not _autoplay
 	_rebuild_obstacles()
 	_run_id = Report.begin_run()
 	Report.ev(0.0, "level", "n=%d" % (level + 1))
@@ -977,6 +990,36 @@ func _show_overlay(kind: String) -> void:
 	box.add_child(b4)
 
 
+func _on_boost_picked(kind: String) -> void:
+	Report.ev(_play_time, "boost_pick", "type=%s level=%d" % [kind, level + 1])
+	_snd("build", 1.25)
+	_vibrate(18)
+
+
+func _on_spell_requested(kind: String) -> void:
+	if _paused or _over or _autoplay:
+		return
+	var outcome: Dictionary = _spells.activate(kind, e_px, e_pz)
+	if outcome.is_empty():
+		return
+	var hits: int = int(outcome["hits"])
+	if kind == "meteor":
+		var center: Vector2 = outcome["center"]
+		var damage: float = outcome["damage"]
+		for idx in outcome["indices"]:
+			_damage_enemy(int(idx), damage)
+		_burst(Vector3(center.x, 0.7, center.y), 1, 28, 5.0, 5.0)
+		_burst(Vector3(center.x, 0.7, center.y), 2, 12, 3.5, 5.0)
+		_shake = maxf(_shake, 0.18)
+		_snd("boom", 0.8)
+		_vibrate(45)
+	else:
+		_burst(_hero.position + Vector3(0, 1.0, 0), 2, 12, 3.5, 3.5)
+		_snd("build", 1.6)
+		_vibrate(25)
+	Report.ev(_play_time, "spell_cast", "type=%s affected=%d level=%d" % [kind, hits, level + 1])
+
+
 func _report_end(result: String) -> void:
 	if not Report.is_current(_run_id):
 		return
@@ -1091,9 +1134,11 @@ func _refresh_plate(p: Plate) -> void:
 
 func _process(delta: float) -> void:
 	if _paused or _over:
+		_spells.visible = false
 		_render_all(delta)
 		_check_shots()
 		return
+	_spells.visible = not _autoplay
 	_frames += 1
 	if _play_time > 2.0:
 		_frame_max = maxf(_frame_max, delta)
@@ -1128,6 +1173,9 @@ func _step(delta: float) -> void:
 	if _autoplay:
 		_bot_input()
 	_update_waves(delta)
+	if not _autoplay:
+		_boosts.tick(delta, _hero.position)
+		_spells.tick(delta)
 	_update_hero(delta)
 	_update_enemies(delta)
 	_update_allies(delta)
@@ -1201,6 +1249,7 @@ func _finish(won: bool) -> void:
 	if _over:
 		return
 	_over = true
+	_spells.visible = false
 	_stars_earned = 0
 	if won:
 		_stars_earned = 3 if _base_hp >= 18 else (2 if _base_hp >= 10 else 1)
@@ -1275,8 +1324,9 @@ func _remove_enemy(i: int) -> void:
 
 func _update_enemies(delta: float) -> void:
 	var n := e_id.size()
+	var freeze_rate: float = _spells.enemy_speed_multiplier()
 	for i in n:
-		var spd := e_spd[i]
+		var spd := e_spd[i] * freeze_rate
 		var slow := e_slow[i]
 		if slow > 0.0:
 			spd *= 0.3
@@ -1311,8 +1361,10 @@ func _cleanup_enemies() -> void:
 			var t := e_type[i]
 			if killed:
 				var wp := Vector3(e_px[i], 0.0, e_pz[i])
-				var cn: float = E_COINS[t] * LEVEL_COIN[level]
+				var cn: float = E_COINS[t] * LEVEL_COIN[level] * _boosts.gold_multiplier()
 				_spawn_coins(wp, int(cn) + (1 if randf() < cn - floorf(cn) else 0))
+				if not _autoplay:
+					_boosts.maybe_drop(wp)
 				_burst(wp + Vector3(0, 0.5, 0), 0, 5 if t != 2 else 14, 3.5, 4.0)
 				if _kill_snd_cd <= 0.0:
 					_snd("kill", randf_range(0.9, 1.2))
@@ -1352,6 +1404,11 @@ func _furthest_in_range(from: Vector3, r: float) -> int:
 func _hit_base(dmg: int) -> void:
 	_wave_leaks += 1
 	_leaks_total += 1
+	if _boosts.consume_barrier():
+		Report.ev(_play_time, "barrier_block", "damage_prevented=%d" % dmg)
+		_burst(_base_pos + Vector3(0, 1.0, 0), 2, 8, 3.0, 3.0)
+		_snd("build", 0.85)
+		return
 	_base_hp = maxi(0, _base_hp - dmg)
 	_shake = 0.6
 	_snd("hit")
@@ -1414,7 +1471,7 @@ func _update_hero(delta: float) -> void:
 
 
 func _update_hero_weapon(delta: float) -> void:
-	_hero_cd -= delta
+	_hero_cd -= delta * _boosts.hero_rate_multiplier()
 	if _hero_cd > 0.0:
 		return
 	var tgt := _nearest_enemy(_hero.position, HERO_RANGE)
@@ -1511,7 +1568,7 @@ func _update_towers(delta: float) -> void:
 		var st: Dictionary = KIND[p.kind]
 		var li: int = p.level - 1
 		var rng: float = st["range"][li]
-		p.cooldown -= delta
+		p.cooldown -= delta * _boosts.tower_rate_multiplier()
 		p.recoil = maxf(0.0, p.recoil - delta * 7.0)
 		var tgt := _furthest_in_range(p.pos, rng)
 		if tgt >= 0 and p.head:
@@ -1895,6 +1952,7 @@ func _render_stack() -> void:
 
 
 func _update_hud() -> void:
+	_spells.set_wave_active(_phase == 1, not e_id.is_empty())
 	_stop_label.visible = _stop_t > 0.0
 	_coin_label.text = str(_carried)
 	_hp_bar.value = _base_hp
