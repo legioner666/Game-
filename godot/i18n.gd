@@ -49,6 +49,12 @@ const STR := {
 	"cannon": {"uk": "Гармата", "en": "Cannon"},
 	"barracks": {"uk": "Казарма", "en": "Barracks"},
 	"upgrade": {"uk": "Покращити", "en": "Upgrade"},
+	"boost_haste": {"uk": "Швидкість веж", "en": "Tower haste"},
+	"boost_frenzy": {"uk": "Шалений темп", "en": "Frenzy"},
+	"boost_gold": {"uk": "Золота лихоманка", "en": "Gold rush"},
+	"boost_barrier": {"uk": "Бар'єр", "en": "Barrier"},
+	"spell_freeze": {"uk": "Крига", "en": "Freeze"},
+	"spell_meteor": {"uk": "Метеор", "en": "Meteor"},
 }
 
 
