@@ -77,8 +77,10 @@ const PLATE_DEFS := [
 	{"kind": "barracks", "pos": Vector3(1.5, 0, 12.8)},
 ]
 # Група: [тип, кількість, старт (с), інтервал (с)]
-const LEVEL_MULT := [1.0, 1.5, 1.9]
-const LEVEL_BRUTES := [0, 1, 2]
+const LEVEL_MULT := [1.0, 1.9, 2.5]
+const LEVEL_HP := [1.0, 1.2, 1.4]
+const LEVEL_SPD := [1.0, 1.04, 1.08]
+const LEVEL_BRUTES := [0, 2, 3]
 const WAVES := [
 	[[0, 7, 0.0, 1.2]],
 	[[0, 11, 0.0, 1.0], [1, 4, 4.0, 1.8]],
@@ -1150,7 +1152,7 @@ func _finish(won: bool) -> void:
 	_over = true
 	_stars_earned = 0
 	if won:
-		_stars_earned = 3 if _base_hp >= 15 else (2 if _base_hp >= 8 else 1)
+		_stars_earned = 3 if _base_hp >= 18 else (2 if _base_hp >= 10 else 1)
 		if not _autoplay:
 			Settings.record_stars(level, _stars_earned)
 	_report_end("win" if won else "lose")
@@ -1181,8 +1183,8 @@ func _spawn_enemy(t: int) -> void:
 	e_id.append(id)
 	e_type.append(t)
 	e_dist.append(d)
-	e_spd.append(randf_range(E_SPD_MIN[t], E_SPD_MAX[t]))
-	e_hp.append(E_HP[t])
+	e_spd.append(randf_range(E_SPD_MIN[t], E_SPD_MAX[t]) * LEVEL_SPD[level])
+	e_hp.append(E_HP[t] * LEVEL_HP[level])
 	e_ox.append(randf_range(-off, off))
 	e_oz.append(randf_range(-off, off))
 	e_ph.append(randf() * TAU)
@@ -1765,7 +1767,7 @@ func _render_enemies() -> void:
 		var pos := Vector3(e_px[i], bob * 0.1, e_pz[i])
 		_b_enemy[t].add(pos, _path_yaw(e_dist[i]), sc, sc * (1.0 + bob * 0.07), sc)
 		if t == 2:
-			var ratio := clampf(e_hp[i] / float(E_HP[2]), 0.0, 1.0)
+			var ratio := clampf(e_hp[i] / (float(E_HP[2]) * LEVEL_HP[level]), 0.0, 1.0)
 			var bp := Vector3(e_px[i] - 0.75, 2.9, e_pz[i]) + toward_cam * 0.5
 			_b_hp_bg.add(bp, 0.0, 1.0, 1.0, 1.0)
 			_b_hp_fg.add(bp + toward_cam * 0.04, 0.0, maxf(0.01, ratio), 1.0, 1.0)
