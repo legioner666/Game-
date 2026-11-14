@@ -553,16 +553,25 @@ func _build_decor() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 11
 	var trees := Batch.new(self, Models.tree_mesh(), 90)
+	var rtrees := Batch.new(self, Models.round_tree_mesh(), 60)
 	var rocks := Batch.new(self, Models.rock_mesh(), 40)
-	trees.begin()
-	rocks.begin()
+	var bushes := Batch.new(self, Models.bush_mesh(), 60)
+	var flowers := Batch.new(self, Models.flower_mesh(), 90)
+	var tufts := Batch.new(self, Models.tuft_mesh(), 200)
+	var pebbles := Batch.new(self, Models.pebble_mesh(), 120)
+	for b in [trees, rtrees, rocks, bushes, flowers, tufts, pebbles]:
+		b.begin()
 	var tries := 0
 	var placed_t := 0
 	var placed_r := 0
-	while tries < 900 and (placed_t < 70 or placed_r < 26):
+	var placed_s := 0
+	var placed_f := 0
+	var placed_u := 0
+	while tries < 2200 and (placed_t < 70 or placed_r < 26 or placed_s < 36 or placed_f < 50 or placed_u < 140):
 		tries += 1
 		var p := Vector3(rng.randf_range(-17.0, 17.0), 0.0, rng.randf_range(-27.0, 27.0))
-		if _dist_to_path(p) < 3.2:
+		var dpath := _dist_to_path(p)
+		if dpath < 1.9:
 			continue
 		if p.distance_to(BASE_POS) < 5.0 or p.distance_to(HERO_START) < 2.5:
 			continue
@@ -574,16 +583,42 @@ func _build_decor() -> void:
 				break
 		if near_plate:
 			continue
-		if rng.randf() < 0.72 and placed_t < 70:
+		var roll := rng.randf()
+		if roll < 0.28 and placed_t < 70 and dpath > 3.2:
 			var s := rng.randf_range(0.8, 1.35)
-			trees.add(p, rng.randf() * TAU, s, s * rng.randf_range(0.9, 1.2), s)
+			(trees if rng.randf() < 0.6 else rtrees).add(p, rng.randf() * TAU, s, s * rng.randf_range(0.9, 1.2), s)
 			placed_t += 1
-		elif placed_r < 26:
+		elif roll < 0.38 and placed_r < 26 and dpath > 3.2:
 			var s2 := rng.randf_range(0.7, 1.4)
 			rocks.add(p, rng.randf() * TAU, s2, s2, s2)
 			placed_r += 1
-	trees.end()
-	rocks.end()
+		elif roll < 0.52 and placed_s < 36:
+			var s3 := rng.randf_range(0.8, 1.3)
+			bushes.add(p, rng.randf() * TAU, s3, s3, s3)
+			placed_s += 1
+		elif roll < 0.68 and placed_f < 50:
+			var s4 := rng.randf_range(0.9, 1.4)
+			flowers.add(p, rng.randf() * TAU, s4, s4, s4)
+			placed_f += 1
+		elif placed_u < 140:
+			var s5 := rng.randf_range(0.8, 1.5)
+			tufts.add(p, rng.randf() * TAU, s5, s5, s5)
+			placed_u += 1
+	# камінці вздовж країв стежки
+	var k := 0
+	while k < _samples.size() and k < 4000:
+		if k % 5 == 0 and rng.randf() < 0.6:
+			var sp := _samples[k]
+			var side := -1.0 if rng.randf() < 0.5 else 1.0
+			var ang := _yaws[mini(k, _yaws.size() - 1)]
+			var nrm := Vector3(cos(ang), 0, -sin(ang)) * side
+			var pp2 := sp + nrm * rng.randf_range(1.55, 1.95)
+			if pp2.distance_to(BASE_POS) > 4.0:
+				var s6 := rng.randf_range(0.7, 1.3)
+				pebbles.add(pp2, rng.randf() * TAU, s6, s6, s6)
+		k += 1
+	for b in [trees, rtrees, rocks, bushes, flowers, tufts, pebbles]:
+		b.end()
 
 
 func _build_batches() -> void:

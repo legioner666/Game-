@@ -132,10 +132,18 @@ static func no_shadow(n: GeometryInstance3D) -> void:
 # ---------- Рої: вороги ----------
 
 static func grunt_mesh() -> ArrayMesh:
+	var dark := Color(0.10, 0.08, 0.08)
 	return compose([
 		part(capsule(0.27, 0.86, 7, 2), Vector3(0, 0.43, 0), RED),
+		part(box(Vector3(0.58, 0.1, 0.36)), Vector3(0, 0.5, 0), Color(0.25, 0.15, 0.1)),
 		part(sphere(0.2, 7), Vector3(0, 0.98, 0), SKIN),
+		part(box(Vector3(0.05, 0.05, 0.04)), Vector3(-0.07, 1.0, -0.17), dark),
+		part(box(Vector3(0.05, 0.05, 0.04)), Vector3(0.07, 1.0, -0.17), dark),
 		part(cyl(0.17, 0.22, 0.17, 7), Vector3(0, 1.12, 0), STONE_D),
+		part(cyl(0.0, 0.05, 0.22, 5), Vector3(-0.2, 1.22, 0), Color(0.93, 0.9, 0.8), Vector3(0, 0, 40)),
+		part(cyl(0.0, 0.05, 0.22, 5), Vector3(0.2, 1.22, 0), Color(0.93, 0.9, 0.8), Vector3(0, 0, -40)),
+		part(cyl(0.27, 0.27, 0.06, 9), Vector3(-0.36, 0.62, -0.1), WOOD, Vector3(0, 0, 90)),
+		part(sphere(0.09, 6), Vector3(-0.4, 0.62, -0.1), STONE),
 		part(box(Vector3(0.09, 0.62, 0.09)), Vector3(0.34, 0.62, -0.1), WOOD, Vector3(-30, 0, 0)),
 		part(sphere(0.12, 5), Vector3(0.34, 0.9, -0.27), STONE_D),
 	])
@@ -143,24 +151,39 @@ static func grunt_mesh() -> ArrayMesh:
 
 static func runner_mesh() -> ArrayMesh:
 	var orange := Color(0.96, 0.52, 0.12)
+	var dark := Color(0.10, 0.08, 0.08)
 	return compose([
 		part(capsule(0.22, 0.74, 7, 2), Vector3(0, 0.37, 0), orange),
 		part(sphere(0.18, 7), Vector3(0, 0.84, 0), SKIN),
-		part(cyl(0.185, 0.185, 0.07, 7), Vector3(0, 0.95, 0), RED_D),
+		part(box(Vector3(0.05, 0.05, 0.04)), Vector3(-0.06, 0.86, -0.15), dark),
+		part(box(Vector3(0.05, 0.05, 0.04)), Vector3(0.06, 0.86, -0.15), dark),
+		part(cyl(0.0, 0.2, 0.3, 6), Vector3(0, 1.0, 0.02), RED_D),
+		part(box(Vector3(0.1, 0.06, 0.55)), Vector3(0, 0.66, 0.36), RED, Vector3(-18, 0, 0)),
 		part(box(Vector3(0.05, 0.4, 0.05)), Vector3(0.28, 0.5, -0.15), Color(0.85, 0.87, 0.92), Vector3(-60, 0, 0)),
+		part(box(Vector3(0.05, 0.4, 0.05)), Vector3(-0.28, 0.5, -0.15), Color(0.85, 0.87, 0.92), Vector3(-60, 0, 0)),
 	])
 
 
 static func brute_mesh() -> ArrayMesh:
+	var dark := Color(0.10, 0.08, 0.08)
 	return compose([
 		part(capsule(0.52, 1.7, 9, 3), Vector3(0, 0.85, 0), Color(0.78, 0.15, 0.12)),
 		part(sphere(0.45, 8), Vector3(0, 0.6, -0.18), Color(0.95, 0.62, 0.52), Vector3.ZERO, Vector3(1.0, 0.8, 0.9)),
+		part(box(Vector3(1.1, 0.14, 0.7)), Vector3(0, 0.62, 0), Color(0.25, 0.15, 0.1)),
 		part(sphere(0.31, 8), Vector3(0, 1.85, -0.05), SKIN),
+		part(box(Vector3(0.07, 0.06, 0.05)), Vector3(-0.1, 1.88, -0.32), dark),
+		part(box(Vector3(0.07, 0.06, 0.05)), Vector3(0.1, 1.88, -0.32), dark),
 		part(cyl(0.26, 0.34, 0.26, 8), Vector3(0, 2.07, -0.05), STONE_D),
+		part(cyl(0.0, 0.09, 0.4, 5), Vector3(-0.32, 2.3, -0.05), Color(0.93, 0.9, 0.8), Vector3(0, 0, 35)),
+		part(cyl(0.0, 0.09, 0.4, 5), Vector3(0.32, 2.3, -0.05), Color(0.93, 0.9, 0.8), Vector3(0, 0, -35)),
+		part(sphere(0.3, 7), Vector3(-0.62, 1.55, 0), STONE_D, Vector3.ZERO, Vector3(1.2, 0.8, 1.2)),
+		part(sphere(0.3, 7), Vector3(0.62, 1.55, 0), STONE_D, Vector3.ZERO, Vector3(1.2, 0.8, 1.2)),
 		part(capsule(0.17, 0.8, 7, 2), Vector3(-0.66, 1.15, 0), SKIN, Vector3(0, 0, 12)),
 		part(capsule(0.17, 0.8, 7, 2), Vector3(0.66, 1.15, -0.1), SKIN, Vector3(-30, 0, -12)),
 		part(box(Vector3(0.2, 1.1, 0.2)), Vector3(0.78, 1.15, -0.45), WOOD, Vector3(-35, 0, 0)),
 		part(box(Vector3(0.42, 0.42, 0.42)), Vector3(0.78, 1.62, -0.78), STONE_D, Vector3(-35, 0, 0)),
+		part(cyl(0.0, 0.07, 0.2, 5), Vector3(0.78, 1.62, -1.0), STONE, Vector3(-125, 0, 0)),
+		part(cyl(0.0, 0.07, 0.2, 5), Vector3(0.98, 1.7, -0.78), STONE, Vector3(0, 0, -90)),
 	])
 
 
@@ -215,6 +238,53 @@ static func tree_mesh() -> ArrayMesh:
 	])
 
 
+static func round_tree_mesh() -> ArrayMesh:
+	return compose([
+		part(cyl(0.13, 0.19, 0.9, 6), Vector3(0, 0.45, 0), WOOD),
+		part(sphere(0.78, 7), Vector3(0, 1.4, 0), Color(0.36, 0.62, 0.34), Vector3.ZERO, Vector3(1.0, 0.9, 1.0)),
+		part(sphere(0.5, 6), Vector3(0.42, 1.2, 0.2), Color(0.42, 0.68, 0.38)),
+		part(sphere(0.45, 6), Vector3(-0.38, 1.7, -0.15), Color(0.32, 0.56, 0.32)),
+	])
+
+
+static func bush_mesh() -> ArrayMesh:
+	return compose([
+		part(sphere(0.42, 6), Vector3(0, 0.22, 0), Color(0.30, 0.52, 0.30), Vector3.ZERO, Vector3(1.2, 0.8, 1.0)),
+		part(sphere(0.3, 6), Vector3(0.32, 0.2, 0.1), Color(0.36, 0.58, 0.34)),
+		part(sphere(0.06, 4), Vector3(-0.2, 0.42, -0.2), Color(0.85, 0.25, 0.25)),
+		part(sphere(0.06, 4), Vector3(0.1, 0.46, 0.15), Color(0.85, 0.25, 0.25)),
+	])
+
+
+static func flower_mesh() -> ArrayMesh:
+	var green := Color(0.30, 0.52, 0.28)
+	return compose([
+		part(box(Vector3(0.03, 0.26, 0.03)), Vector3(0, 0.13, 0), green),
+		part(sphere(0.09, 5), Vector3(0, 0.29, 0), Color(0.97, 0.85, 0.30)),
+		part(box(Vector3(0.03, 0.2, 0.03)), Vector3(0.18, 0.1, 0.1), green),
+		part(sphere(0.08, 5), Vector3(0.18, 0.22, 0.1), Color(0.95, 0.95, 0.92)),
+		part(box(Vector3(0.03, 0.22, 0.03)), Vector3(-0.14, 0.11, 0.14), green),
+		part(sphere(0.08, 5), Vector3(-0.14, 0.24, 0.14), Color(0.93, 0.45, 0.50)),
+	])
+
+
+static func tuft_mesh() -> ArrayMesh:
+	var g1 := Color(0.36, 0.56, 0.34)
+	var g2 := Color(0.28, 0.48, 0.30)
+	return compose([
+		part(cyl(0.0, 0.05, 0.34, 4), Vector3(0, 0.17, 0), g1, Vector3(0, 0, 8)),
+		part(cyl(0.0, 0.05, 0.28, 4), Vector3(0.1, 0.14, 0.04), g2, Vector3(10, 0, -14)),
+		part(cyl(0.0, 0.05, 0.26, 4), Vector3(-0.1, 0.13, -0.03), g2, Vector3(-8, 0, 16)),
+	])
+
+
+static func pebble_mesh() -> ArrayMesh:
+	return compose([
+		part(sphere(0.2, 5), Vector3(0, 0.05, 0), Color(0.66, 0.60, 0.52), Vector3.ZERO, Vector3(1.2, 0.5, 1.0)),
+		part(sphere(0.12, 5), Vector3(0.22, 0.03, 0.1), Color(0.58, 0.52, 0.46), Vector3.ZERO, Vector3(1.0, 0.5, 1.0)),
+	])
+
+
 static func rock_mesh() -> ArrayMesh:
 	return compose([
 		part(sphere(0.6, 5), Vector3(0, 0.2, 0), Color(0.58, 0.60, 0.62), Vector3.ZERO, Vector3(1.0, 0.65, 1.15)),
@@ -238,14 +308,23 @@ static func hero() -> Node3D:
 		var a := TAU * k / 5.0
 		body.add_child(mi(cyl(0.0, 0.07, 0.17, 5), Vector3(cos(a) * 0.2, 1.98, sin(a) * 0.2), GOLD))
 	body.add_child(mi(box(Vector3(0.62, 0.95, 0.07)), Vector3(0, 1.0, 0.33), Color(0.80, 0.12, 0.16), Vector3(8, 0, 0)))  # плащ
+	body.add_child(mi(box(Vector3(0.05, 0.05, 0.04)), Vector3(-0.09, 1.6, -0.24), Color(0.1, 0.08, 0.08)))   # очі
+	body.add_child(mi(box(Vector3(0.05, 0.05, 0.04)), Vector3(0.09, 1.6, -0.24), Color(0.1, 0.08, 0.08)))
+	body.add_child(mi(sphere(0.15, 6), Vector3(-0.4, 1.42, 0), GOLD))                       # наплічники
+	body.add_child(mi(sphere(0.15, 6), Vector3(0.4, 1.42, 0), GOLD))
+	body.add_child(mi(cyl(0.1, 0.1, 0.6, 6), Vector3(0.16, 1.2, 0.42), WOOD, Vector3(0, 0, 14)))  # сагайдак
+	for qi in 3:
+		body.add_child(mi(box(Vector3(0.03, 0.2, 0.03)), Vector3(0.2 + qi * 0.03 - 0.03, 1.56, 0.42), Color(0.95, 0.95, 0.92), Vector3(0, 0, 14)))
 
 	var leg_l := Node3D.new()
 	leg_l.position = Vector3(-0.16, 0.45, 0)
 	leg_l.add_child(mi(box(Vector3(0.18, 0.46, 0.2)), Vector3(0, -0.2, 0), Color(0.40, 0.26, 0.15)))
+	leg_l.add_child(mi(box(Vector3(0.22, 0.14, 0.32)), Vector3(0, -0.38, -0.04), Color(0.22, 0.14, 0.09)))
 	root.add_child(leg_l)
 	var leg_r := Node3D.new()
 	leg_r.position = Vector3(0.16, 0.45, 0)
 	leg_r.add_child(mi(box(Vector3(0.18, 0.46, 0.2)), Vector3(0, -0.2, 0), Color(0.40, 0.26, 0.15)))
+	leg_r.add_child(mi(box(Vector3(0.22, 0.14, 0.32)), Vector3(0, -0.38, -0.04), Color(0.22, 0.14, 0.09)))
 	root.add_child(leg_r)
 
 	var arm_l := Node3D.new()
