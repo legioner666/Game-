@@ -3,7 +3,7 @@ name: Android stress test APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, "gpt/**", "claude/**"]
     paths:
       - "godot/**"
       - ".github/workflows/android-stress.yml"
@@ -69,7 +69,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete stress-latest --yes --cleanup-tag || true
-          gh release create stress-latest godot/build/crown-rush-stress.apk \
-            --prerelease --title "Stress test build" \
-            --notes "Автоматична збірка стрес-тесту. Встановити APK на Android і дивитись FPS."
+          TAG="stress-latest"
+          if [ "$GITHUB_REF_NAME" != "main" ]; then
+            TAG="build-$(echo "$GITHUB_REF_NAME" | tr '/' '-')"
+          fi
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release create "$TAG" godot/build/crown-rush-stress.apk \
+            --target "$GITHUB_SHA" \
+            --prerelease --title "Build: $GITHUB_REF_NAME" \
+            --notes "Автоматична збірка гілки $GITHUB_REF_NAME, коміт $GITHUB_SHA. Встановити APK на Android."
