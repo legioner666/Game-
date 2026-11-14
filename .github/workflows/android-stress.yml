@@ -1,0 +1,79 @@
+name: Android stress test APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "godot/**"
+      - ".github/workflows/android-stress.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GODOT_VERSION: "4.4.1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Godot and export templates
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+          include-templates: true
+
+      - name: Install Android SDK components
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" "build-tools;35.0.1" "platforms;android-35" "cmdline-tools;latest"
+
+      - name: Configure Godot for Android export
+        run: |
+          mkdir -p ~/.config/godot
+          cat > ~/.config/godot/editor_settings-4.4.tres <<EOT
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          EOT
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android \
+            -keystore "$HOME/debug.keystore" -storepass android \
+            -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
+
+      - name: Import project and export APK
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/../debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          cp "$HOME/debug.keystore" "${{ github.workspace }}/../debug.keystore"
+          mkdir -p godot/build
+          godot --headless --path godot --import || true
+          godot --headless --path godot --export-debug "Android" build/crown-rush-stress.apk
+          ls -la godot/build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crown-rush-stress-apk
+          path: godot/build/crown-rush-stress.apk
+
+      - name: Publish as GitHub release (direct APK download)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete stress-latest --yes --cleanup-tag || true
+          gh release create stress-latest godot/build/crown-rush-stress.apk \
+            --prerelease --title "Stress test build" \
+            --notes "Автоматична збірка стрес-тесту. Встановити APK на Android і дивитись FPS."
