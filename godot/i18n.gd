@@ -5,7 +5,7 @@ const Settings = preload("res://settings.gd")
 
 const STR := {
 	"title": {"uk": "CROWN RUSH", "en": "CROWN RUSH"},
-	"tagline": {"uk": "Збирай золото. Будуй вежі. Зупини орду.", "en": "Collect gold. Build towers. Stop the horde."},
+	"tagline": {"uk": "Золото — у вежі. Фортеця — під захистом.", "en": "Turn gold into towers. Hold the keep."},
 	"play": {"uk": "Грати", "en": "Play"},
 	"settings": {"uk": "Налаштування", "en": "Settings"},
 	"copy_report": {"uk": "Скопіювати звіт", "en": "Copy report"},
@@ -25,6 +25,7 @@ const STR := {
 	"wave_start": {"uk": "Хвиля %d", "en": "Wave %d"},
 	"wave_clear": {"uk": "Хвилю відбито! +%d", "en": "Wave cleared! +%d"},
 	"base": {"uk": "Замок", "en": "Castle"},
+	"stop_hint": {"uk": "Зупинись, щоб будувати", "en": "Stop to build"},
 	"hint_move": {"uk": "Тягни палець по екрану, щоб рухатись", "en": "Drag your finger to move"},
 	"hint_build": {"uk": "Збирай монети й стань на плитку з ціною, щоб побудувати вежу", "en": "Collect coins and stand on a tile to build a tower"},
 	"pause": {"uk": "Пауза", "en": "Paused"},

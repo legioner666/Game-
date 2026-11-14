@@ -28,10 +28,43 @@ class CrownIcon extends Control:
 		draw_polyline(PackedVector2Array([pts[0], pts[1], pts[2], pts[3], pts[4], pts[5], pts[6], pts[0]]), dark, 8.0)
 		draw_rect(Rect2(10, 170, 320, 40), dark)
 		for c in [Vector2(10, 70), Vector2(170, 10), Vector2(330, 70)]:
-			draw_circle(c, 22.0, Color(0.9, 0.2, 0.25))
+			draw_circle(c, 22.0, Color(0.72, 0.3, 0.27))
 			draw_arc(c, 22.0, 0.0, TAU, 24, dark, 5.0)
 		for x in [70.0, 170.0, 270.0]:
 			draw_circle(Vector2(x, 190), 10.0, Color(0.35, 0.65, 1.0))
+
+
+class CastleScene extends Control:
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var w := size.x
+		var h := size.y
+		var hill := Color("#527B5C")
+		var hill2 := Color("#79A678")
+		var stone := Color("#7f93a0")
+		var stone_d := Color("#5d717e")
+		var roof := Color("#B84C44")
+		draw_colored_polygon(PackedVector2Array([Vector2(0, h * 0.84), Vector2(w * 0.3, h * 0.8), Vector2(w * 0.7, h * 0.83), Vector2(w, h * 0.79), Vector2(w, h), Vector2(0, h)]), hill)
+		draw_colored_polygon(PackedVector2Array([Vector2(0, h * 0.9), Vector2(w * 0.4, h * 0.87), Vector2(w, h * 0.91), Vector2(w, h), Vector2(0, h)]), hill2)
+		# дорога до замку
+		draw_colored_polygon(PackedVector2Array([Vector2(w * 0.44, h * 0.82), Vector2(w * 0.56, h * 0.82), Vector2(w * 0.8, h), Vector2(w * 0.2, h)]), Color("#D7B68D"))
+		# замок
+		var cx := w * 0.5
+		var base_y := h * 0.82
+		draw_rect(Rect2(cx - 150, base_y - 150, 300, 150), stone)
+		for i in 5:
+			draw_rect(Rect2(cx - 150 + i * 64, base_y - 185, 44, 38), stone)
+		for sx in [-1.0, 1.0]:
+			var tx: float = cx + sx * 190.0
+			draw_rect(Rect2(tx - 45, base_y - 230, 90, 230), stone_d)
+			draw_colored_polygon(PackedVector2Array([Vector2(tx - 62, base_y - 230), Vector2(tx + 62, base_y - 230), Vector2(tx, base_y - 330)]), roof)
+		draw_rect(Rect2(cx - 36, base_y - 90, 72, 90), Color("#3b2a1f"))
+		draw_circle(Vector2(cx, base_y - 90), 36.0, Color("#3b2a1f"))
+		# прапор
+		draw_line(Vector2(cx, base_y - 185), Vector2(cx, base_y - 290), Color("#3b2a1f"), 6.0)
+		draw_colored_polygon(PackedVector2Array([Vector2(cx, base_y - 290), Vector2(cx + 70, base_y - 265), Vector2(cx, base_y - 240)]), Color("#E8B547"))
 
 
 func _ready() -> void:
@@ -65,13 +98,18 @@ func _button(text: String, color: Color, height: float = 150.0, font: int = 62) 
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(0, height)
 	b.add_theme_font_size_override("font_size", font)
+	var dark_text := color.get_luminance() > 0.5
+	var tc := Color("#2a2015") if dark_text else Color("#F2E6CB")
+	b.add_theme_color_override("font_color", tc)
+	b.add_theme_color_override("font_hover_color", tc)
+	b.add_theme_color_override("font_pressed_color", tc)
 	b.add_theme_stylebox_override("normal", _style(color))
 	b.add_theme_stylebox_override("hover", _style(color.lightened(0.1)))
 	b.add_theme_stylebox_override("pressed", _style(color.darkened(0.15)))
 	return b
 
 
-func _label(text: String, font: int, color: Color = Color.WHITE) -> Label:
+func _label(text: String, font: int, color: Color = Color("#F2E6CB")) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", font)
@@ -102,8 +140,8 @@ func _build() -> void:
 	add_child(_root)
 
 	var grad := Gradient.new()
-	grad.set_color(0, Color("#27406e"))
-	grad.set_color(1, Color("#0a1224"))
+	grad.set_color(0, Color("#3a5d73"))
+	grad.set_color(1, Color("#142634"))
 	var gt := GradientTexture2D.new()
 	gt.gradient = grad
 	gt.fill_from = Vector2(0.5, 0.0)
@@ -115,6 +153,10 @@ func _build() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg.stretch_mode = TextureRect.STRETCH_SCALE
 	_root.add_child(bg)
+
+	var scene := CastleScene.new()
+	scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_root.add_child(scene)
 
 	var box := VBoxContainer.new()
 	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -137,24 +179,24 @@ func _build_main(box: VBoxContainer) -> void:
 	crown_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	crown_row.add_child(CrownIcon.new())
 	box.add_child(crown_row)
-	box.add_child(_label(I18n.t("title"), 130, Color(1.0, 0.85, 0.3)))
-	box.add_child(_label(I18n.t("tagline"), 50, Color(0.85, 0.92, 1.0)))
+	box.add_child(_label(I18n.t("title"), 130, Color("#F8D874")))
+	box.add_child(_label(I18n.t("tagline"), 50, Color("#F2E6CB")))
 	var spacer := Control.new()
 	spacer.custom_minimum_size = Vector2(0, 120)
 	box.add_child(spacer)
-	var play := _button(I18n.t("play"), Color(0.2, 0.65, 0.3), 190, 82)
+	var play := _button(I18n.t("play"), Color("#E8B547"), 190, 82)
 	play.pressed.connect(func():
 		_click()
 		play_pressed.emit())
 	box.add_child(play)
-	var st := _button(I18n.t("settings"), Color(0.28, 0.35, 0.55), 150, 58)
+	var st := _button(I18n.t("settings"), Color("#2f4b5f"), 150, 58)
 	st.pressed.connect(func(): _go("settings"))
 	box.add_child(st)
 
 
 func _toggle_row(box: VBoxContainer, key: String, value: bool, setter: Callable) -> void:
 	var text := "%s: %s" % [I18n.t(key), I18n.t("on") if value else I18n.t("off")]
-	var b := _button(text, Color(0.2, 0.55, 0.3) if value else Color(0.45, 0.3, 0.3), 140, 54)
+	var b := _button(text, Color("#4f8a5a") if value else Color("#7a4a44"), 140, 54)
 	b.pressed.connect(func():
 		setter.call(not value)
 		Settings.save_settings()
@@ -164,7 +206,7 @@ func _toggle_row(box: VBoxContainer, key: String, value: bool, setter: Callable)
 
 func _build_settings(box: VBoxContainer) -> void:
 	box.add_child(_label(I18n.t("settings"), 100, Color(1.0, 0.85, 0.3)))
-	var lang := _button("%s: %s" % [I18n.t("language"), I18n.t("lang_name")], Color(0.28, 0.35, 0.55), 140, 54)
+	var lang := _button("%s: %s" % [I18n.t("language"), I18n.t("lang_name")], Color("#2f4b5f"), 140, 54)
 	lang.pressed.connect(func():
 		Settings.lang = "en" if Settings.lang == "uk" else "uk"
 		Settings.save_settings()
@@ -184,6 +226,6 @@ func _build_settings(box: VBoxContainer) -> void:
 		Report.copy_to_clipboard()
 		rep.text = I18n.t("copied"))
 	box.add_child(rep)
-	var back := _button(I18n.t("back"), Color(0.85, 0.6, 0.1), 150, 58)
+	var back := _button(I18n.t("back"), Color("#E8B547"), 150, 58)
 	back.pressed.connect(func(): _go("main"))
 	box.add_child(back)

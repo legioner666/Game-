@@ -30,7 +30,7 @@ const CAM_Z_MIN := -6.0
 const CAM_Z_MAX := 12.5
 const CAM_X_LIMIT := 4.0
 const CAM_FOV := 30.0
-const DEPOSIT_MAX_SPEED := 2.5
+const DEPOSIT_MAX_SPEED := 3.2
 const JOY_RADIUS := 170.0
 const JOY_DEADZONE := 0.1
 
@@ -43,13 +43,13 @@ const HERO_CD := 0.65
 const CARRY_CAP := 150
 const START_COINS := 15
 const MAGNET_RADIUS := 3.0
-const PLATE_REACH := 1.9
+const PLATE_REACH := 2.3
 const DEPOSIT_INTERVAL := 0.045
 const COIN_LIFETIME := 14.0
 const BASE_HP_MAX := 20
 const MAX_ENEMIES := 600
 const MAX_COINS := 450
-const STACK_VISIBLE := 60
+const STACK_VISIBLE := 40
 const ALLY_AGGRO := 7.0
 const ALLY_SPEED := 4.6
 
@@ -351,6 +351,8 @@ var _sub_label: Label
 var _hp_bar: ProgressBar
 var _hint_label: Label
 var _banner_label: Label
+var _stop_label: Label
+var _stop_t := 0.0
 var _banner_tween: Tween
 var _overlay: Control
 var _stack_label: Label3D
@@ -458,17 +460,17 @@ func _dist_to_path(p: Vector3) -> float:
 func _build_world() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.62, 0.78, 0.92)
+	env.background_color = Color(0.70, 0.82, 0.88)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.78, 0.80, 0.88)
-	env.ambient_light_energy = 0.65
+	env.ambient_light_color = Color(0.86, 0.83, 0.80)
+	env.ambient_light_energy = 0.45
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
 
 	_light = DirectionalLight3D.new()
 	_light.rotation_degrees = Vector3(-58, 28, 0)
-	_light.light_energy = 1.05
+	_light.light_energy = 0.8
 	_light.shadow_enabled = Settings.shadows
 	_light.directional_shadow_max_distance = 60.0
 	add_child(_light)
@@ -483,11 +485,11 @@ func _build_world() -> void:
 	_camera.look_at(Vector3(_cam_x, 0, _cam_z))
 
 	# земля, стежка
-	var ground := Models.mi(Models.box(Vector3(160, 0.2, 160)), Vector3(0, -0.1, 0), Color(0.42, 0.67, 0.32))
+	var ground := Models.mi(Models.box(Vector3(160, 0.2, 160)), Vector3(0, -0.1, 0), Color(0.47, 0.65, 0.47))
 	Models.no_shadow(ground)
 	add_child(ground)
-	var rim_c := Color(0.62, 0.50, 0.34)
-	var sand_c := Color(0.87, 0.75, 0.53)
+	var rim_c := Color(0.66, 0.50, 0.35)
+	var sand_c := Color(0.84, 0.71, 0.55)
 	for i in WAYPOINTS.size() - 1:
 		var a := WAYPOINTS[i]
 		var b := WAYPOINTS[i + 1]
@@ -616,10 +618,10 @@ func _build_plates() -> void:
 		p.node = Node3D.new()
 		p.node.position = p.pos
 		add_child(p.node)
-		p.tile = Models.mi(Models.box(Vector3(2.6, 0.06, 2.6)), Vector3(0, 0.06, 0), Color(0.40, 0.30, 0.22))
+		p.tile = Models.mi(Models.box(Vector3(2.6, 0.06, 2.6)), Vector3(0, 0.06, 0), Color(0.36, 0.34, 0.32))
 		Models.no_shadow(p.tile)
 		p.node.add_child(p.tile)
-		p.fill = Models.mi(Models.box(Vector3(2.4, 0.05, 1.0)), Vector3(0, 0.1, 1.2), Color(0.35, 0.85, 0.35))
+		p.fill = Models.mi(Models.box(Vector3(2.4, 0.05, 1.0)), Vector3(0, 0.1, 1.2), Color(0.91, 0.71, 0.28))
 		Models.no_shadow(p.fill)
 		p.fill.visible = false
 		p.node.add_child(p.fill)
@@ -723,7 +725,7 @@ func _build_ui() -> void:
 	bar.add_theme_constant_override("separation", 20)
 	root.add_child(bar)
 
-	var pause := _make_button("II", Vector2(110, 110), Color(0.15, 0.2, 0.32, 0.9), 54)
+	var pause := _make_button("II", Vector2(110, 110), Color(0.125, 0.21, 0.28, 0.92), 54)
 	pause.pressed.connect(_toggle_pause)
 	bar.add_child(pause)
 
@@ -741,7 +743,7 @@ func _build_ui() -> void:
 
 	var chip := PanelContainer.new()
 	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	chip.add_theme_stylebox_override("panel", _style_box(Color(0.1, 0.14, 0.24, 0.85), 40))
+	chip.add_theme_stylebox_override("panel", _style_box(Color(0.125, 0.21, 0.28, 0.88), 40))
 	bar.add_child(chip)
 	var chip_row := HBoxContainer.new()
 	chip_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -770,7 +772,7 @@ func _build_ui() -> void:
 	_hp_bar.custom_minimum_size = Vector2(0, 34)
 	_hp_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hp_bar.add_theme_stylebox_override("background", _style_box(Color(0.08, 0.08, 0.12, 0.8), 17))
-	_hp_bar.add_theme_stylebox_override("fill", _style_box(Color(0.9, 0.25, 0.22), 17))
+	_hp_bar.add_theme_stylebox_override("fill", _style_box(Color(0.85, 0.32, 0.27), 17))
 	hp_row.add_child(_hp_bar)
 
 	_hint_label = _make_label(I18n.t("hint_move"), 46, Color(1, 1, 1))
@@ -785,16 +787,27 @@ func _build_ui() -> void:
 	_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(_hint_label)
 
-	_banner_label = _make_label("", 110, Color(1.0, 0.9, 0.45))
-	_banner_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_banner_label = _make_label("", 72, Color(1.0, 0.9, 0.45))
+	_banner_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_banner_label.offset_left = -520
 	_banner_label.offset_right = 520
-	_banner_label.offset_top = -200
-	_banner_label.offset_bottom = -60
+	_banner_label.offset_top = 285
+	_banner_label.offset_bottom = 395
 	_banner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_banner_label.pivot_offset = Vector2(520, 70)
+	_banner_label.pivot_offset = Vector2(520, 55)
 	_banner_label.modulate.a = 0.0
-	_banner_label.add_theme_constant_override("outline_size", 24)
+	_banner_label.add_theme_constant_override("outline_size", 18)
+	_stop_label = _make_label(I18n.t("stop_hint"), 52, Color(1, 1, 1))
+	_stop_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_stop_label.offset_left = -400
+	_stop_label.offset_right = 400
+	_stop_label.offset_top = -520
+	_stop_label.offset_bottom = -420
+	_stop_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_stop_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_stop_label.add_theme_stylebox_override("normal", _style_box(Color(0.08, 0.14, 0.2, 0.75), 30))
+	_stop_label.visible = false
+	root.add_child(_stop_label)
 	root.add_child(_banner_label)
 
 
@@ -818,7 +831,7 @@ func _show_overlay(kind: String) -> void:
 	_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_ui.add_child(_overlay)
 	var dim := ColorRect.new()
-	dim.color = Color(0.02, 0.04, 0.1, 0.72)
+	dim.color = Color(0.05, 0.1, 0.14, 0.78)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_overlay.add_child(dim)
 	var box := VBoxContainer.new()
@@ -1559,6 +1572,7 @@ func _update_coins(delta: float) -> void:
 
 func _update_plates(delta: float) -> void:
 	var hp := _hero.position
+	_stop_t = maxf(0.0, _stop_t - delta)
 	var active: Plate = null
 	for p in _plates:
 		if p.level >= 3:
@@ -1568,6 +1582,8 @@ func _update_plates(delta: float) -> void:
 		if dx * dx + dz * dz <= PLATE_REACH * PLATE_REACH:
 			active = p
 			break
+	if active != null and _carried > 0 and _real_speed > DEPOSIT_MAX_SPEED:
+		_stop_t = 0.5
 	if active == null or _carried <= 0 or _real_speed > DEPOSIT_MAX_SPEED:
 		_deposit_timer = 0.0
 		return
@@ -1775,6 +1791,7 @@ func _render_stack() -> void:
 
 
 func _update_hud() -> void:
+	_stop_label.visible = _stop_t > 0.0
 	_coin_label.text = str(_carried)
 	_hp_bar.value = _base_hp
 	_wave_label.text = I18n.t("wave") % [mini(_wave + 1, WAVES.size()), WAVES.size()]
