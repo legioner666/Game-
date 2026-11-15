@@ -1,0 +1,17 @@
+{
+  "name": "Parasite Evolution development",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "hostRequirements": { "cpus": 2, "memory": "8gb" },
+  "postCreateCommand": "bash parasite-evolution/Tools/setup_remote.sh",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "files.exclude": {
+          "**/Library": true,
+          "**/Temp": true,
+          "**/obj": true
+        }
+      }
+    }
+  }
+}
