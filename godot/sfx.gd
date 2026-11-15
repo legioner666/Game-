@@ -49,7 +49,7 @@ func _ready() -> void:
 	_streams["win"] = _tone(380.0, 1270.0, 0.69, 0.43, 0.02, 0.32)
 	_streams["lose"] = _tone(390.0, 68.0, 0.78, 0.45, 0.12, 0.19)
 	_streams["click"] = _tone(630.0, 495.0, 0.050, 0.27, 0.02)
-	for key: String in EXTRA:
+	for key in EXTRA:
 		_pending.append(key)
 	set_process(not _pending.is_empty())
 
