@@ -5,9 +5,10 @@ extends Node3D
 signal picked(kind: String)
 
 const I18n = preload("res://i18n.gd")
+const Models = preload("res://models.gd")
 const TYPES := ["haste", "frenzy", "gold", "barrier"]
 const DURATION := 11.0
-const DROP_CHANCE := 0.025
+const DROP_CHANCE := 0.04
 const PICKUP_LIFE := 14.0
 const PICKUP_RADIUS := 2.3
 const MAX_PICKUPS := 12
@@ -86,6 +87,7 @@ func setup_hud(layer: CanvasLayer) -> void:
 	_hud.offset_bottom = 557
 	_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hud.add_theme_constant_override("separation", 10)
+	_hud.alignment = BoxContainer.ALIGNMENT_CENTER
 	layer.add_child(_hud)
 	for kind in TYPES:
 		var panel := PanelContainer.new()
@@ -104,10 +106,12 @@ func setup_hud(layer: CanvasLayer) -> void:
 		var label := Label.new()
 		label.add_theme_font_size_override("font_size", 21)
 		label.clip_text = true
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		label.add_theme_color_override("font_color", Color(1.0, 0.97, 0.89))
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(label)
-		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		panel.custom_minimum_size = Vector2(250, 0)
 		panel.add_child(row)
 		_hud.add_child(panel)
 		_panels[kind] = panel
@@ -115,18 +119,74 @@ func setup_hud(layer: CanvasLayer) -> void:
 		panel.visible = false
 
 
+func _glow(c: Color, a: float) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.albedo_color = Color(c.r, c.g, c.b, a)
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return m
+
+
+func _icon(kind: String) -> Node3D:
+	## Distinct readable silhouette per boost, large and rotating.
+	var n := Node3D.new()
+	var c: Color = SHADES[kind]
+	var dark := c.darkened(0.45)
+	match kind:
+		"haste":  # lightning bolt
+			n.add_child(Models.mi(Models.box(Vector3(0.34, 0.95, 0.3)), Vector3(0.12, 0.38, 0), c, Vector3(0, 0, 22)))
+			n.add_child(Models.mi(Models.box(Vector3(0.34, 0.95, 0.3)), Vector3(-0.12, -0.38, 0), c, Vector3(0, 0, 22)))
+			n.add_child(Models.mi(Models.box(Vector3(0.78, 0.3, 0.3)), Vector3(0, 0.02, 0), dark))
+		"frenzy":  # crossed swords
+			for sgn in [-1.0, 1.0]:
+				n.add_child(Models.mi(Models.box(Vector3(0.2, 1.7, 0.12)), Vector3.ZERO, Color(0.92, 0.94, 1.0), Vector3(0, 0, 45.0 * sgn)))
+				n.add_child(Models.mi(Models.box(Vector3(0.55, 0.14, 0.2)), Vector3(-0.42 * sgn, -0.42, 0), c, Vector3(0, 0, 45.0 * sgn)))
+			n.add_child(Models.mi(Models.sphere(0.2), Vector3.ZERO, c))
+		"gold":  # coin purse with big coin
+			n.add_child(Models.mi(Models.sphere(0.55, 10), Vector3(0, -0.1, 0), Color(0.92, 0.62, 0.12)))
+			n.add_child(Models.mi(Models.cyl(0.18, 0.3, 0.3), Vector3(0, 0.5, 0), dark))
+			n.add_child(Models.mi(Models.cyl(0.4, 0.4, 0.08, 12), Vector3(0, -0.1, 0.5), Color(1.0, 0.9, 0.3), Vector3(90, 0, 0)))
+		"barrier":  # shield
+			n.add_child(Models.mi(Models.box(Vector3(0.95, 0.8, 0.2)), Vector3(0, 0.2, 0), c))
+			n.add_child(Models.mi(Models.cyl(0.0, 0.48, 0.6, 4), Vector3(0, -0.4, 0), c, Vector3(90, 45, 0), Vector3(1, 1, 0.42)))
+			n.add_child(Models.mi(Models.box(Vector3(0.18, 1.0, 0.24)), Vector3(0, 0.0, 0.02), Color.WHITE))
+	return n
+
+
 func maybe_drop(pos: Vector3) -> void:
 	if _pickups.size() >= MAX_PICKUPS or randf() >= DROP_CHANCE:
 		return
-	var kind: String = TYPES[randi_range(0, TYPES.size() - 1)]
-	var model := MeshInstance3D.new()
-	model.mesh = _pickup_mesh
-	model.material_override = _materials[kind]
-	model.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(model)
-	var drop_pos := pos + Vector3(0, 0.8, 0)
-	model.position = drop_pos
-	_pickups.append({"kind": kind, "pos": pos, "node": model, "life": 0.0})
+	_spawn_pickup(TYPES[randi_range(0, TYPES.size() - 1)], pos)
+
+
+func _spawn_pickup(kind: String, pos: Vector3) -> void:
+	var c: Color = SHADES[kind]
+	var root := Node3D.new()
+	add_child(root)
+	root.position = pos
+	# ground ring + tall light beam: visible from afar and above the coin pile
+	var ring := Models.mi(Models.cyl(0.8, 0.8, 0.04, 20), Vector3(0, 0.06, 0), c)
+	ring.material_override = _glow(c, 0.55)
+	root.add_child(ring)
+	var icon := _icon(kind)
+	icon.scale = Vector3.ONE * 0.95
+	root.add_child(icon)
+	var tag := Label3D.new()
+	tag.text = I18n.t("boost_" + kind)
+	tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	tag.no_depth_test = true
+	tag.font_size = 72
+	tag.pixel_size = 0.0038
+	tag.outline_size = 16
+	tag.modulate = c.lightened(0.35)
+	tag.outline_modulate = Color(0.05, 0.08, 0.12)
+	tag.position = Vector3(0, 1.9, 0)
+	root.add_child(tag)
+	for node in [ring, icon]:
+		if node is GeometryInstance3D:
+			node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_pickups.append({"kind": kind, "pos": pos, "node": root, "icon": icon, "life": 0.0})
 
 
 func tick(delta: float, hero: Vector3) -> void:
@@ -142,10 +202,13 @@ func tick(delta: float, hero: Vector3) -> void:
 		var p: Dictionary = _pickups[i]
 		var age: float = float(p["life"]) + delta
 		p["life"] = age
-		var model: MeshInstance3D = p["node"]
+		var model: Node3D = p["node"]
+		var icon: Node3D = p["icon"]
 		var pos: Vector3 = p["pos"]
-		model.position = pos + Vector3(0, 0.85 + 0.18 * sin(age * 5.0), 0)
-		model.rotation.y += delta * 2.0
+		icon.position = Vector3(0, 0.95 + 0.14 * sin(age * 4.0), 0)
+		icon.rotation = Vector3(-0.95, 0.45 * sin(age * 2.0), 0.0)
+		if age > PICKUP_LIFE - 3.0:  # blink before vanishing
+			model.visible = int(age * 6.0) % 2 == 0
 		var dx: float = hero.x - pos.x
 		var dz: float = hero.z - pos.z
 		if dx * dx + dz * dz <= PICKUP_RADIUS * PICKUP_RADIUS:
