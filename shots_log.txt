@@ -1,0 +1,18 @@
+OK   L0 t=30
+OK   L0 t=70
+OK   L0 t=120
+OK   L1 t=40
+FAIL L1 t=90 exit=124 (немає PNG)
+     at: initialize (servers/audio_server.cpp:246)
+
+[bot] wave 1 start t=4 base=20 carried=0
+[bot] wave 2 start t=46 base=16 carried=0
+[bot] RESULT won=false wave=2 base=0 coins=27 time=86
+OK   L2 t=40
+FAIL L2 t=90 exit=124 (немає PNG)
+     at: initialize (servers/audio_server.cpp:246)
+
+[bot] wave 1 start t=4 base=20 carried=0
+[bot] wave 2 start t=45 base=14 carried=0
+[bot] RESULT won=false wave=2 base=0 coins=16 time=78
+expected=7 produced=5
