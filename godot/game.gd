@@ -188,6 +188,7 @@ class Arrow:
 	var target_id := -1
 	var last := Vector3.ZERO
 	var dmg := 0.0
+	var src := "hero"
 	var speed := 26.0
 
 
@@ -197,6 +198,7 @@ class Ball:
 	var t := 0.0
 	var dur := 0.7
 	var dmg := 0.0
+	var src := "cannon"
 	var aoe := 2.0
 
 
@@ -329,6 +331,8 @@ var _perk_overlay: Control
 var _over := false
 var _built_any := false
 var _spent := 0
+var _src := "hero"
+var _dmg_by := {}
 var _lost_coins := 0
 var _wave_leaks := 0
 var _leaks_total := 0
@@ -1088,6 +1092,7 @@ func _on_meteor_impact(world: Vector3) -> void:
 		var dx: float = e_px[i] - world.x
 		var dz: float = e_pz[i] - world.z
 		if dx * dx + dz * dz <= radius2:
+			_src = "meteor"
 			_damage_enemy(i, Spells.METEOR_DAMAGE)
 			hits += 1
 	_burst(world + Vector3(0, 0.7, 0), 1, 28, 5.0, 5.0)
@@ -1102,6 +1107,10 @@ func _report_end(result: String) -> void:
 	if not Report.is_current(_run_id):
 		return
 	var fps_avg := _fps_sum / maxf(1.0, float(_fps_n))
+	var parts: Array = []
+	for k in _dmg_by:
+		parts.append("%s=%d" % [k, int(_dmg_by[k])])
+	Report.ev(_play_time, "damage", " ".join(parts))
 	Report.ev(_play_time, "summary", "result=%s wave=%d base=%d collected=%d spent=%d lost_on_ground=%d leaked=%d pauses=%d fps_avg=%.0f fps_min=%.0f worst_frame_ms=%.0f frames_over_25ms=%d/%d" % [result, _wave + 1, _base_hp, _total_collected, _spent, _lost_coins, _leaks_total, _pause_count, fps_avg, minf(_fps_min, fps_avg), _frame_max * 1000.0, _slow_frames, _frames])
 	Report.end_run(result)
 
@@ -1517,6 +1526,7 @@ func _update_enemies(delta: float) -> void:
 
 
 func _damage_enemy(i: int, dmg: float) -> void:
+	_dmg_by[_src] = float(_dmg_by.get(_src, 0.0)) + minf(dmg, maxf(e_hp[i], 0.0))
 	e_hp[i] -= dmg
 	_show_damage(Vector3(e_px[i], 1.5 if e_type[i] != 2 else 3.2, e_pz[i]), dmg, e_type[i] == 2 or dmg >= 40.0)
 
@@ -1718,7 +1728,7 @@ func _update_hero_weapon(delta: float) -> void:
 
 # ---------- Снаряди ----------
 
-func _spawn_arrow(from: Vector3, tgt: int, dmg: float) -> void:
+func _spawn_arrow(from: Vector3, tgt: int, dmg: float, src: String = "hero") -> void:
 	if _arrows.size() >= 120:
 		return
 	var a := Arrow.new()
@@ -1726,10 +1736,12 @@ func _spawn_arrow(from: Vector3, tgt: int, dmg: float) -> void:
 	a.target_id = e_id[tgt]
 	a.last = Vector3(e_px[tgt], 0.6, e_pz[tgt])
 	a.dmg = dmg
+	a.src = src
 	_arrows.append(a)
 
 
 func _spawn_ball(from: Vector3, tgt: int, dmg: float, aoe: float) -> void:
+	# src береться з кулі: гармата
 	if _balls.size() >= 30:
 		return
 	var dest := Vector3(e_px[tgt], 0.0, e_pz[tgt])
@@ -1760,6 +1772,7 @@ func _update_projectiles(delta: float) -> void:
 		var step := a.speed * delta
 		if dist <= step + 0.25:
 			if alive:
+				_src = a.src
 				_damage_enemy(_idx_of[a.target_id], a.dmg)
 			_arrows.remove_at(i)
 		else:
@@ -1781,6 +1794,7 @@ func _explode(b: Ball) -> void:
 		var dx := e_px[k] - b.dest.x
 		var dz := e_pz[k] - b.dest.z
 		if dx * dx + dz * dz <= r2:
+			_src = b.src
 			_damage_enemy(k, b.dmg)
 	_burst(b.dest + Vector3(0, 0.4, 0), 1, 10, 4.5, 3.0)
 	_burst(b.dest + Vector3(0, 0.4, 0), 2, 6, 3.5, 5.0)
@@ -1816,7 +1830,7 @@ func _update_towers(delta: float) -> void:
 				var muzzle: Vector3 = p.tower.get_meta("muzzle")
 				var from: Vector3 = p.head.to_global(muzzle)
 				if p.kind == "crossbow":
-					_spawn_arrow(from, tgt, dmg)
+					_spawn_arrow(from, tgt, dmg, "crossbow")
 					_snd("shoot", randf_range(0.95, 1.1))
 				else:
 					var aoe: float = st["aoe"][li]
@@ -1889,6 +1903,7 @@ func _update_allies(delta: float) -> void:
 				var dx := e_px[k] - a.pos.x
 				var dz := e_pz[k] - a.pos.z
 				if dx * dx + dz * dz < 1.6:
+					_src = "barracks"
 					_damage_enemy(k, dmg)
 		i -= 1
 
@@ -2018,7 +2033,7 @@ func _update_plates(delta: float) -> void:
 
 func _complete_plate(p: Plate) -> void:
 	p.level += 1
-	Report.ev(_play_time, "build" if p.level == 1 else "upgrade", "%s level=%d first=%s" % [p.kind, p.level, str(_first_build)])
+	Report.ev(_play_time, "build" if p.level == 1 else "upgrade", "%s level=%d first=%s plate=%d cost=%d carried=%d wave=%d" % [p.kind, p.level, str(_first_build), _plates.find(p), p.progress, _carried, _wave + 1])
 	_first_build = false
 	p.progress = 0
 	p.cooldown = 0.3
