@@ -531,6 +531,13 @@ static func crossbow_tower(level: int) -> Node3D:
 		head.add_child(mi(sphere(0.12, 6), Vector3(0, 0.42, 0.3), GOLD))
 		root.add_child(mi(cyl(0.05, 0.05, 0.7, 5), Vector3(0.55, 1.95, 0.55), WOOD))
 		root.add_child(mi(box(Vector3(0.4, 0.26, 0.04)), Vector3(0.75, 2.15, 0.55), BLUE))
+	if level >= 4:
+		for sx in [-1.0, 1.0]:
+			for sz in [-1.0, 1.0]:
+				root.add_child(mi(sphere(0.1, 6), Vector3(0.48 * sx, 1.55, 0.48 * sz), GOLD))
+		head.add_child(mi(cyl(0.3, 0.3, 0.08, 8), Vector3(0, 0.1, 0), GOLD))
+		root.add_child(mi(box(Vector3(0.4, 0.26, 0.04)), Vector3(-0.75, 2.15, -0.55), GOLD))
+		root.add_child(mi(cyl(0.05, 0.05, 0.7, 5), Vector3(-0.55, 1.95, -0.55), WOOD))
 	root.add_child(head)
 	root.set_meta("head", head)
 	root.set_meta("muzzle", Vector3(0, 0.3, -0.85))
@@ -553,6 +560,9 @@ static func cannon_tower(level: int) -> Node3D:
 	head.add_child(mi(cyl(r + 0.05, r + 0.05, 0.14, 9), Vector3(0, 0.12, -0.15), GOLD if level >= 2 else STONE_D, Vector3(-80, 0, 0)))
 	if level >= 3:
 		head.add_child(mi(cyl(r + 0.05, r + 0.05, 0.14, 9), Vector3(0, 0.15, -0.75), GOLD, Vector3(-80, 0, 0)))
+	if level >= 4:
+		head.add_child(mi(cyl(r + 0.05, r + 0.05, 0.14, 9), Vector3(0, 0.1, -0.95), GOLD, Vector3(-80, 0, 0)))
+		root.add_child(mi(cyl(0.98, 0.98, 0.1, 9), Vector3(0, 1.6, 0), GOLD))
 	head.add_child(mi(sphere(0.3, 8), Vector3(0, 0.05, 0.1), Color(0.28, 0.28, 0.32)))
 	root.add_child(head)
 	root.set_meta("head", head)
@@ -574,6 +584,10 @@ static func barracks(level: int) -> Node3D:
 	if level >= 2:
 		root.add_child(mi(box(Vector3(0.5, 0.9, 0.5)), Vector3(-1.2, 0.45, -0.4), STONE))
 		root.add_child(mi(cyl(0.0, 0.42, 0.5, 4), Vector3(-1.2, 1.15, -0.4), BLUE, Vector3(0, 45, 0)))
+	if level >= 4:
+		root.add_child(mi(box(Vector3(2.35, 0.1, 1.9)), Vector3(0, 1.22, 0), GOLD))
+		root.add_child(mi(cyl(0.04, 0.04, 1.1, 5), Vector3(-0.9, 2.2, 0), WOOD))
+		root.add_child(mi(box(Vector3(0.6, 0.38, 0.04)), Vector3(-1.22, 2.45, 0), GOLD))
 	root.set_meta("door", Vector3(0, 0, 1.4))
 	return root
 

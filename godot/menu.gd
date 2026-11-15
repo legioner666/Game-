@@ -5,6 +5,7 @@ signal play_pressed(level: int)
 signal stress_pressed
 
 const I18n = preload("res://i18n.gd")
+const MenuScene = preload("res://menu_scene.gd")
 const Settings = preload("res://settings.gd")
 const Progression = preload("res://progression.gd")
 
@@ -142,24 +143,27 @@ func _build() -> void:
 	_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_root)
 
-	var grad := Gradient.new()
-	grad.set_color(0, Color("#3a5d73"))
-	grad.set_color(1, Color("#142634"))
-	var gt := GradientTexture2D.new()
-	gt.gradient = grad
-	gt.fill_from = Vector2(0.5, 0.0)
-	gt.fill_to = Vector2(0.5, 1.0)
-	gt.width = 8
-	gt.height = 256
-	var bg := TextureRect.new()
-	bg.texture = gt
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg.stretch_mode = TextureRect.STRETCH_SCALE
-	_root.add_child(bg)
-
-	var scene := CastleScene.new()
-	scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_root.add_child(scene)
+	_root.add_child(MenuScene.new())
+	# затемнення: на головній — м'яке знизу, на інших сторінках — рівне для читабельності
+	var shade := TextureRect.new()
+	var sg := Gradient.new()
+	var main_page := _page == "main"
+	sg.set_color(0, Color(0.04, 0.08, 0.16, 0.45 if main_page else 0.82))
+	sg.set_color(1, Color(0.04, 0.08, 0.16, 0.0 if main_page else 0.82))
+	if main_page:
+		sg.add_point(0.55, Color(0.04, 0.08, 0.16, 0.0))
+		sg.set_color(2, Color(0.04, 0.08, 0.16, 0.80))
+	var sgt := GradientTexture2D.new()
+	sgt.gradient = sg
+	sgt.fill_from = Vector2(0.5, 0.0)
+	sgt.fill_to = Vector2(0.5, 1.0)
+	sgt.width = 8
+	sgt.height = 256
+	shade.texture = sgt
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.stretch_mode = TextureRect.STRETCH_SCALE
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(shade)
 
 	var box := VBoxContainer.new()
 	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -182,24 +186,29 @@ func _build() -> void:
 
 
 func _build_main(box: VBoxContainer) -> void:
-	var crown_row := HBoxContainer.new()
-	crown_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	crown_row.add_child(CrownIcon.new())
-	box.add_child(crown_row)
-	box.add_child(_label(I18n.t("title"), 130, Color("#F8D874")))
-	box.add_child(_label(I18n.t("tagline"), 50, Color("#F2E6CB")))
+	box.offset_top = 120
+	box.offset_bottom = -150
+	var logo := _label(I18n.t("title"), 124, Color("#FFD95A"))
+	logo.add_theme_constant_override("outline_size", 24)
+	box.add_child(logo)
+	box.add_child(_label(I18n.t("tagline"), 46, Color("#FFF4D6")))
 	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 120)
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(spacer)
-	var play := _button(I18n.t("play"), Color("#E8B547"), 190, 82)
+	var play := _button(I18n.t("play"), Color("#F2B63A"), 200, 88)
 	play.pressed.connect(func(): _go("levels"))
 	box.add_child(play)
-	var workshop := _button(I18n.t("workshop"), Color("#355c62"), 150, 58)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 26)
+	box.add_child(row)
+	var workshop := _button(I18n.t("workshop"), Color("#2f7f8c"), 150, 46)
+	workshop.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	workshop.pressed.connect(func(): _go("workshop"))
-	box.add_child(workshop)
-	var st := _button(I18n.t("settings"), Color("#2f4b5f"), 150, 58)
+	row.add_child(workshop)
+	var st := _button(I18n.t("settings"), Color("#4a5f9c"), 150, 46)
+	st.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	st.pressed.connect(func(): _go("settings"))
-	box.add_child(st)
+	row.add_child(st)
 
 
 func _build_levels(box: VBoxContainer) -> void:
@@ -290,13 +299,17 @@ func _build_settings(box: VBoxContainer) -> void:
 	box.add_child(lang)
 	_toggle_row(box, "shadows", Settings.shadows, func(v): Settings.shadows = v)
 	_toggle_row(box, "vibration", Settings.vibration, func(v): Settings.vibration = v)
+	_toggle_row(box, "music", Settings.music, func(v): Settings.music = v)
 	_toggle_row(box, "sound", Settings.sound, func(v): Settings.sound = v)
+	var tools := OS.is_debug_build()
 	var stress := _button(I18n.t("stress"), Color(0.25, 0.25, 0.3), 120, 46)
+	stress.visible = tools
 	stress.pressed.connect(func():
 		_click()
 		stress_pressed.emit())
 	box.add_child(stress)
 	var rep := _button(I18n.t("copy_report"), Color(0.2, 0.4, 0.55), 120, 46)
+	rep.visible = tools
 	rep.pressed.connect(func():
 		_click()
 		Report.copy_to_clipboard()

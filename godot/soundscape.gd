@@ -36,14 +36,14 @@ func set_mode(mode: String) -> void:
 	_player.stop()
 	_player.stream = _tracks[mode]
 	_player.volume_db = -55.0
-	if Settings.sound:
+	if Settings.music:
 		_player.play()
 
 
 func _process(delta: float) -> void:
 	if _mode == "":
 		return
-	if not Settings.sound:
+	if not Settings.music:
 		if _player.playing:
 			_player.stop()
 		return

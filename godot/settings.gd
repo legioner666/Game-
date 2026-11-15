@@ -7,6 +7,7 @@ static var lang := "uk"
 static var shadows := true
 static var vibration := true
 static var sound := true
+static var music := true
 static var stars: Array = [0, 0, 0]
 # Persistent improvements bought with the best-earned (non-consumed) level stars.
 static var upgrades: Dictionary = {"crossbow": 0, "cannon": 0, "barracks": 0}
@@ -23,6 +24,7 @@ static func load_settings() -> void:
 	shadows = bool(cf.get_value("main", "shadows", shadows))
 	vibration = bool(cf.get_value("main", "vibration", vibration))
 	sound = bool(cf.get_value("main", "sound", sound))
+	music = bool(cf.get_value("main", "music", music))
 	for i in LEVEL_COUNT:
 		stars[i] = clampi(int(cf.get_value("progress", "stars_%d" % i, 0)), 0, 3)
 	for kind in upgrades:
@@ -35,6 +37,7 @@ static func save_settings() -> void:
 	cf.set_value("main", "shadows", shadows)
 	cf.set_value("main", "vibration", vibration)
 	cf.set_value("main", "sound", sound)
+	cf.set_value("main", "music", music)
 	for i in LEVEL_COUNT:
 		cf.set_value("progress", "stars_%d" % i, stars[i])
 	for kind in upgrades:
