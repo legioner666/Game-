@@ -6,6 +6,7 @@ signal stress_pressed
 
 const I18n = preload("res://i18n.gd")
 const Settings = preload("res://settings.gd")
+const Progression = preload("res://progression.gd")
 
 var sfx: Node
 var _root: Control
@@ -173,6 +174,8 @@ func _build() -> void:
 		_build_main(box)
 	elif _page == "levels":
 		_build_levels(box)
+	elif _page == "workshop":
+		_build_workshop(box)
 	else:
 		_build_settings(box)
 
@@ -190,6 +193,9 @@ func _build_main(box: VBoxContainer) -> void:
 	var play := _button(I18n.t("play"), Color("#E8B547"), 190, 82)
 	play.pressed.connect(func(): _go("levels"))
 	box.add_child(play)
+	var workshop := _button(I18n.t("workshop"), Color("#355c62"), 150, 58)
+	workshop.pressed.connect(func(): _go("workshop"))
+	box.add_child(workshop)
 	var st := _button(I18n.t("settings"), Color("#2f4b5f"), 150, 58)
 	st.pressed.connect(func(): _go("settings"))
 	box.add_child(st)
@@ -219,6 +225,38 @@ func _build_levels(box: VBoxContainer) -> void:
 			st.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			row.add_child(st)
 	var back := _button(I18n.t("back"), Color("#2f4b5f"), 140, 54)
+	back.pressed.connect(func(): _go("main"))
+	box.add_child(back)
+
+
+func _build_workshop(box: VBoxContainer) -> void:
+	box.add_child(_label(I18n.t("workshop"), 92, Color("#F8D874")))
+	box.add_child(_label(I18n.t("tech_points") % [Progression.available_points(), Progression.earned_points()], 52))
+	box.add_child(_label(I18n.t("tech_help"), 42))
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 30)
+	box.add_child(spacer)
+	for kind in Progression.KINDS:
+		var current_rank: int = Progression.rank(kind)
+		var next_cost: int = Progression.next_price(kind)
+		var cost_label: String = I18n.t("tech_max") if next_cost == 0 else I18n.t("tech_cost") % next_cost
+		var label_text := "%s  %d/%d · %s" % [I18n.t(kind), current_rank, Progression.MAX_RANK, cost_label]
+		var button := _button(label_text, Color("#386f63") if Progression.can_buy(kind) else Color("#354956"), 140, 44)
+		button.disabled = not Progression.can_buy(kind)
+		var upgrade_kind: String = kind
+		button.pressed.connect(func():
+			if Progression.buy(upgrade_kind):
+				_go("workshop"))
+		box.add_child(button)
+		var percent: int = 6 * current_rank if kind == "crossbow" else (5 * current_rank if kind == "cannon" else 8 * current_rank)
+		box.add_child(_label(I18n.t("tech_" + kind + "_desc") % percent, 39))
+	if Progression.spent_points() > 0:
+		var reset := _button(I18n.t("tech_reset"), Color("#6b4c3d"), 115, 46)
+		reset.pressed.connect(func():
+			Progression.reset()
+			_go("workshop"))
+		box.add_child(reset)
+	var back := _button(I18n.t("back"), Color("#E8B547"), 145, 56)
 	back.pressed.connect(func(): _go("main"))
 	box.add_child(back)
 
