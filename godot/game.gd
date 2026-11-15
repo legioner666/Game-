@@ -284,6 +284,10 @@ var _hero_yaw := 0.0
 var _walk_phase := 0.0
 var _hero_cd := 0.0
 var _bow_kick := 0.0
+const DMG_POOL := 24
+var _dmg_labels: Array = []
+var _dmg_age: Array[float] = []
+var _dmg_next := 0
 var _carried := START_COINS
 var _total_collected := 0
 var _deposit_timer := 0.0
@@ -1438,6 +1442,49 @@ func _update_enemies(delta: float) -> void:
 
 func _damage_enemy(i: int, dmg: float) -> void:
 	e_hp[i] -= dmg
+	_show_damage(Vector3(e_px[i], 1.5 if e_type[i] != 2 else 3.2, e_pz[i]), dmg, e_type[i] == 2 or dmg >= 40.0)
+
+
+## Спливаючі цифри шкоди: пул з фіксованої кількості Label3D (без алокацій у бою).
+func _show_damage(pos: Vector3, dmg: float, big: bool) -> void:
+	if _autoplay and not _show_ui:
+		return
+	if not big and randf() > 0.35:
+		return
+	if _dmg_labels.is_empty():
+		for k in DMG_POOL:
+			var l := Label3D.new()
+			l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			l.pixel_size = 0.014
+			l.font_size = 64
+			l.outline_size = 14
+			l.no_depth_test = true
+			l.shaded = false
+			l.visible = false
+			add_child(l)
+			_dmg_labels.append(l)
+			_dmg_age.append(9.0)
+	var idx := _dmg_next
+	_dmg_next = (_dmg_next + 1) % DMG_POOL
+	var lab: Label3D = _dmg_labels[idx]
+	lab.text = str(int(round(dmg)))
+	lab.modulate = Color(1.0, 0.85, 0.3) if big else Color(1.0, 1.0, 1.0)
+	lab.font_size = 84 if big else 60
+	lab.position = pos + Vector3(randf_range(-0.4, 0.4), 0.0, randf_range(-0.2, 0.2))
+	lab.visible = true
+	_dmg_age[idx] = 0.0
+
+
+func _update_damage_labels(delta: float) -> void:
+	for k in _dmg_labels.size():
+		if _dmg_age[k] >= 0.7:
+			if _dmg_labels[k].visible:
+				_dmg_labels[k].visible = false
+			continue
+		_dmg_age[k] += delta
+		var lab: Label3D = _dmg_labels[k]
+		lab.position.y += delta * 2.2
+		lab.modulate.a = clampf(1.0 - (_dmg_age[k] - 0.35) / 0.35, 0.0, 1.0)
 
 
 func _cleanup_enemies() -> void:
@@ -1553,9 +1600,18 @@ func _update_hero(delta: float) -> void:
 	var body := _hero.get_meta("body") as Node3D
 	body.position.y = absf(sin(_walk_phase)) * 0.09 * walk
 	body.scale.y = 1.0 + sin(_time * 3.0) * 0.012
-	_bow_kick = maxf(0.0, _bow_kick - delta * 6.0)
-	(_hero.get_meta("bow") as Node3D).position.z = -0.55 + _bow_kick * 0.14
-	(_hero.get_meta("arm_l") as Node3D).rotation.x = 1.3 + _bow_kick * 0.12
+	_bow_kick = maxf(0.0, _bow_kick - delta * 5.0)
+	# цикл пострілу: 1.0 = щойно випустив (віддача), 0.4..0 = натяг тятиви перед наступним
+	var draw := clampf(1.0 - _hero_cd / maxf(HERO_CD, 0.01), 0.0, 1.0) if tgt >= 0 else 0.0
+	var kick := _bow_kick * _bow_kick
+	(_hero.get_meta("bow") as Node3D).position.z = -0.55 + kick * 0.2 - draw * 0.04
+	(_hero.get_meta("bow") as Node3D).rotation.z = kick * 0.25
+	(_hero.get_meta("arm_l") as Node3D).rotation.x = 1.3 + kick * 0.25
+	if tgt >= 0:
+		# права рука натягує тятиву до плеча, потім різко відпускає
+		(_hero.get_meta("arm_r") as Node3D).rotation.x = lerpf(-sw * 0.9, 1.0, draw) - kick * 0.8
+	body.rotation.x = kick * 0.12 - draw * 0.04
+	body.position.z = kick * 0.08
 
 
 func _update_hero_weapon(delta: float) -> void:
@@ -1830,6 +1886,13 @@ func _update_plates(delta: float) -> void:
 	_stop_t = maxf(0.0, _stop_t - delta)
 	var active: Plate = null
 	for p in _plates:
+		# підписи плитки тьмяніють, коли герой стоїть поруч (не закривають героя й стос золота)
+		var fx: float = p.pos.x - hp.x
+		var fz: float = p.pos.z - hp.z
+		var near := fx * fx + fz * fz < 6.0
+		var a := lerpf(p.label.modulate.a, 0.3 if near else 1.0, 1.0 - exp(-12.0 * delta))
+		p.label.modulate.a = a
+		p.sub_label.modulate.a = a
 		if p.level >= 3:
 			continue
 		var dx: float = p.pos.x - hp.x
@@ -1945,6 +2008,7 @@ func _render_all(delta: float) -> void:
 	_render_allies()
 	_render_coins()
 	_render_projectiles()
+	_update_damage_labels(delta)
 	_render_fx()
 	_render_stack()
 	_shake = maxf(0.0, _shake - delta * 2.5)
