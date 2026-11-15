@@ -1,0 +1,18 @@
+=== level 1 ===
+[bot] wave 1 start t=4 base=20 carried=0
+[bot] wave 2 start t=33 base=20 carried=0
+[bot] wave 3 start t=63 base=20 carried=0
+[bot] wave 4 start t=102 base=20 carried=14
+[bot] wave 5 start t=145 base=20 carried=13
+[bot] RESULT won=true wave=5 base=20 coins=361 time=188
+=== level 2 ===
+[bot] wave 1 start t=4 base=20 carried=0
+[bot] wave 2 start t=47 base=18 carried=0
+[bot] wave 3 start t=93 base=12 carried=8
+[bot] wave 4 start t=151 base=2 carried=3
+[bot] RESULT won=false wave=4 base=0 coins=228 time=196
+=== level 3 ===
+[bot] wave 1 start t=4 base=20 carried=0
+[bot] wave 2 start t=45 base=19 carried=0
+[bot] wave 3 start t=90 base=8 carried=0
+[bot] RESULT won=false wave=3 base=0 coins=109 time=123
