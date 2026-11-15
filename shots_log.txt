@@ -1,0 +1,8 @@
+OK   L0 t=30
+OK   L0 t=60
+OK   L0 t=90
+OK   L1 t=30
+OK   L1 t=60
+OK   L2 t=30
+OK   L2 t=60
+expected=7 produced=7
