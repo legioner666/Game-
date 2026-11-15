@@ -67,13 +67,13 @@ const KIND := {
 	"barracks": {"cost": [30, 45, 65], "cap": [3, 4, 6], "dmg": [8.0, 11.0, 15.0], "hp": [40.0, 60.0, 90.0]},
 }
 # Група: [тип, кількість, старт (с), інтервал (с)]
-const LEVEL_MULT := [1.0, 3.0, 4.2]
+const LEVEL_MULT := [1.2, 3.8, 5.6]
 const LEVEL_START_MULT := [1.0, 1.3, 1.35]
-const LEVEL_HP := [1.0, 1.2, 1.3]
+const LEVEL_HP := [1.0, 1.3, 1.5]
 const LEVEL_SPD := [1.0, 1.04, 1.06]
-const LEVEL_COIN := [1.0, 1.1, 1.25]
+const LEVEL_COIN := [1.0, 1.0, 1.1]
 const LEVEL_START := [15, 20, 30]
-const LEVEL_BRUTES := [0, 3, 6]
+const LEVEL_BRUTES := [1, 5, 9]
 const WAVES := [
 	[[0, 7, 0.0, 1.2]],
 	[[0, 11, 0.0, 1.0], [1, 4, 4.0, 1.8]],

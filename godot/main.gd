@@ -21,15 +21,20 @@ func _ready() -> void:
 	_soundscape = Soundscape.new()
 	add_child(_soundscape)
 	var direct := false
+	var menu_page := ""
 	for a in OS.get_cmdline_user_args():
 		if a == "--autoplay" or a == "--direct":
 			direct = true
+		elif a.begins_with("--page="):
+			menu_page = a.substr(7)
 		elif a.begins_with("--level="):
 			_level = clampi(int(a.substr(8)), 0, Settings.LEVEL_COUNT - 1)
 	if direct:
 		_start_game(_level)
 	else:
 		_show_menu()
+		if menu_page != "" and _menu:
+			_menu._go(menu_page)
 
 
 func _clear() -> void:

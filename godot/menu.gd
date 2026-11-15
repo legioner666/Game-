@@ -11,6 +11,7 @@ const Progression = preload("res://progression.gd")
 var sfx: Node
 var _root: Control
 var _page := "main"
+var start_page := ""
 
 
 class CrownIcon extends Control:
@@ -209,10 +210,11 @@ func _build_levels(box: VBoxContainer) -> void:
 	for lv in Settings.LEVEL_COUNT:
 		var open := Settings.unlocked(lv)
 		var row := Control.new()
-		row.custom_minimum_size = Vector2(0, 190)
+		row.custom_minimum_size = Vector2(0, 250)
 		box.add_child(row)
-		var b := _button((I18n.t("level") % (lv + 1)) + " · " + I18n.t(Levels.data(lv)["name"]), Color("#E8B547") if open else Color("#3a4650"), 190, 72)
+		var b := _button((I18n.t("level") % (lv + 1)) + " · " + I18n.t(Levels.data(lv)["name"]), Color("#E8B547") if open else Color("#3a4650"), 190, 56)
 		b.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		b.offset_bottom = -60
 		b.disabled = not open
 		var l := lv
 		b.pressed.connect(func():
@@ -221,7 +223,14 @@ func _build_levels(box: VBoxContainer) -> void:
 		row.add_child(b)
 		if open:
 			var st := StarRow.new(int(Settings.stars[lv]), 44.0)
-			st.position = Vector2(60, 70)
+			st.anchor_left = 0.5
+			st.anchor_right = 0.5
+			st.anchor_top = 1.0
+			st.anchor_bottom = 1.0
+			st.offset_left = -st.custom_minimum_size.x * 0.5
+			st.offset_right = st.custom_minimum_size.x * 0.5
+			st.offset_top = -st.custom_minimum_size.y - 6.0
+			st.offset_bottom = -6.0
 			st.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			row.add_child(st)
 	var back := _button(I18n.t("back"), Color("#2f4b5f"), 140, 54)

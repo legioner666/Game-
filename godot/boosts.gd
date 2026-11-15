@@ -102,10 +102,12 @@ func setup_hud(layer: CanvasLayer) -> void:
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(Glyph.new(kind, SHADES[kind]))
 		var label := Label.new()
-		label.add_theme_font_size_override("font_size", 27)
+		label.add_theme_font_size_override("font_size", 21)
+		label.clip_text = true
 		label.add_theme_color_override("font_color", Color(1.0, 0.97, 0.89))
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(label)
+		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		panel.add_child(row)
 		_hud.add_child(panel)
 		_panels[kind] = panel
