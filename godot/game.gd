@@ -221,6 +221,7 @@ class Fx:
 	var max_life := 0.5
 	var kind := 0
 	var size := 1.0
+	var spin_y := 0.0
 
 
 class JoyDraw extends Control:
@@ -588,7 +589,8 @@ func _build_world() -> void:
 
 	# замок
 	_castle = Models.castle()
-	_castle.position = _base_pos
+	# зсуваємо замок до центру екрана, щоб його не обрізав край
+	_castle.position = _base_pos + Vector3(-signf(_base_pos.x) * 1.7, 0.0, 0.0)
 	add_child(_castle)
 
 	_build_decor()
@@ -687,6 +689,8 @@ func _build_batches() -> void:
 		Batch.new(self, Models.fx_mesh(Color(0.9, 0.15, 0.12)), 300, false),
 		Batch.new(self, Models.fx_mesh(Color(0.92, 0.9, 0.85)), 300, false),
 		Batch.new(self, Models.fx_mesh(Color(1.0, 0.85, 0.2)), 300, false),
+		Batch.new(self, Models.puff_mesh(), 120, false),
+		Batch.new(self, Models.ring_mesh(), 24, false),
 	]
 	var q_bg := QuadMesh.new()
 	q_bg.size = Vector2(1.5, 0.2)
@@ -1509,6 +1513,10 @@ func _cleanup_enemies() -> void:
 				if not _autoplay:
 					_boosts.maybe_drop(wp)
 				_burst(wp + Vector3(0, 0.5, 0), 0, 5 if t != 2 else 14, 3.5, 4.0)
+				_puff(wp + Vector3(0, 0.4, 0), 2 if t != 2 else 7, 1.0 if t != 2 else 1.8)
+				if t == 2:
+					_ring(wp, 1.6)
+					_shake = maxf(_shake, 0.25)
 				if _kill_snd_cd <= 0.0:
 					_snd("kill", randf_range(0.9, 1.2))
 					_kill_snd_cd = 0.05
@@ -1992,6 +2000,35 @@ func _burst(pos: Vector3, kind: int, n: int, speed: float, up: float) -> void:
 		_fx.append(f)
 
 
+func _puff(pos: Vector3, n: int, scale_mul: float) -> void:
+	for k in n:
+		if _fx.size() >= 700:
+			return
+		var f := Fx.new()
+		f.pos = pos + Vector3(randf_range(-0.3, 0.3), randf_range(0.0, 0.4), randf_range(-0.3, 0.3))
+		var ang := randf() * TAU
+		f.vel = Vector3(cos(ang), 0.0, sin(ang)) * randf_range(0.3, 1.2) * scale_mul
+		f.vel.y = randf_range(0.6, 1.6)
+		f.kind = 3
+		f.max_life = randf_range(0.35, 0.55)
+		f.life = f.max_life
+		f.size = randf_range(0.7, 1.1) * scale_mul
+		_fx.append(f)
+
+
+func _ring(pos: Vector3, size: float) -> void:
+	if _fx.size() >= 700:
+		return
+	var f := Fx.new()
+	f.pos = Vector3(pos.x, 0.08, pos.z)
+	f.kind = 4
+	f.max_life = 0.45
+	f.life = f.max_life
+	f.size = size
+	f.spin_y = randf() * TAU
+	_fx.append(f)
+
+
 func _update_fx(delta: float) -> void:
 	var i := _fx.size() - 1
 	while i >= 0:
@@ -2000,7 +2037,7 @@ func _update_fx(delta: float) -> void:
 		if f.life <= 0.0:
 			_fx.remove_at(i)
 		else:
-			f.vel.y -= 14.0 * delta
+			f.vel.y -= (14.0 if f.kind < 3 else (-1.2 if f.kind == 3 else 0.0)) * delta
 			f.pos += f.vel * delta
 			if f.pos.y < 0.05:
 				f.pos.y = 0.05
@@ -2099,8 +2136,13 @@ func _render_fx() -> void:
 	for b in _b_fx:
 		b.begin()
 	for f in _fx:
-		var s: float = f.size * clampf(f.life / f.max_life, 0.0, 1.0)
-		_b_fx[f.kind].add(f.pos, 0.0, s, s, s)
+		var r: float = clampf(f.life / f.max_life, 0.0, 1.0)
+		var s: float = f.size * r
+		if f.kind == 3:
+			s = f.size * (0.5 + (1.0 - r) * 1.1) * minf(1.0, r * 2.5)
+		elif f.kind == 4:
+			s = f.size * (0.3 + (1.0 - r) * 3.2) * minf(1.0, r * 3.0)
+		_b_fx[f.kind].add(f.pos, f.spin_y, s, s, s)
 	for b in _b_fx:
 		b.end()
 

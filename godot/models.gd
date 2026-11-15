@@ -290,6 +290,19 @@ static func fx_mesh(color: Color) -> ArrayMesh:
 	return compose([part(box(Vector3(0.18, 0.18, 0.18)), Vector3.ZERO, color)])
 
 
+static func puff_mesh() -> ArrayMesh:
+	return compose([part(sphere(0.3, 6), Vector3.ZERO, Color(0.93, 0.92, 0.88))])
+
+
+static func ring_mesh() -> ArrayMesh:
+	# плоске кільце ударної хвилі: 12 коротких плиток по колу
+	var parts: Array = []
+	for k in 12:
+		var a := TAU * k / 12.0
+		parts.append(part(box(Vector3(0.5, 0.05, 0.14)), Vector3(cos(a) * 1.0, 0.0, sin(a) * 1.0), Color(1.0, 0.95, 0.7), Vector3(0, -rad_to_deg(a), 0)))
+	return compose(parts)
+
+
 static func tree_mesh() -> ArrayMesh:
 	return compose([
 		part(cyl(0.12, 0.17, 0.8, 6), Vector3(0, 0.4, 0), WOOD),
@@ -535,9 +548,9 @@ static func barracks(level: int) -> Node3D:
 
 static func castle() -> Node3D:
 	var root := Node3D.new()
-	var stone_l := Color(0.74, 0.76, 0.82)
-	var stone_m := Color(0.62, 0.64, 0.71)
-	var stone_d := Color(0.46, 0.48, 0.56)
+	var stone_l := Color(0.58, 0.60, 0.68)
+	var stone_m := Color(0.48, 0.50, 0.58)
+	var stone_d := Color(0.36, 0.38, 0.46)
 	var roof := Color(0.20, 0.36, 0.86)
 	var roof_d := Color(0.14, 0.26, 0.66)
 	root.add_child(mi(box(Vector3(4.4, 0.35, 3.6)), Vector3(0, 0.17, 0), stone_d))
