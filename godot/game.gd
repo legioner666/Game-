@@ -532,7 +532,10 @@ func _build_world() -> void:
 	env.background_color = _theme["bg"]
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = _theme["ambient"]
-	env.ambient_light_energy = 0.45
+	env.ambient_light_energy = 0.5
+	env.adjustment_enabled = true
+	env.adjustment_saturation = 1.12
+	env.adjustment_contrast = 1.04
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
@@ -540,6 +543,8 @@ func _build_world() -> void:
 	_light = DirectionalLight3D.new()
 	_light.rotation_degrees = Vector3(-58, 28, 0)
 	_light.light_energy = 0.8
+	_light.light_color = Color(1.0, 0.96, 0.88)
+	_light.shadow_blur = 1.6
 	_light.shadow_enabled = Settings.shadows
 	_light.directional_shadow_max_distance = 60.0
 	add_child(_light)
@@ -728,7 +733,7 @@ func _build_plates() -> void:
 		p.node = Node3D.new()
 		p.node.position = p.pos
 		add_child(p.node)
-		p.tile = Models.mi(Models.box(Vector3(2.6, 0.06, 2.6)), Vector3(0, 0.06, 0), Color(0.36, 0.34, 0.32))
+		p.tile = Models.mi(Models.box(Vector3(2.6, 0.06, 2.6)), Vector3(0, 0.06, 0), Color(0.50, 0.47, 0.43))
 		Models.no_shadow(p.tile)
 		p.node.add_child(p.tile)
 		p.fill = Models.mi(Models.box(Vector3(2.4, 0.05, 1.0)), Vector3(0, 0.1, 1.2), Color(0.91, 0.71, 0.28))
@@ -737,8 +742,8 @@ func _build_plates() -> void:
 		p.node.add_child(p.fill)
 		for sx in [-1.0, 1.0]:
 			for sz in [-1.0, 1.0]:
-				var c1 := Models.mi(Models.box(Vector3(0.6, 0.05, 0.12)), Vector3(1.3 * sx, 0.11, 1.3 * sz - 0.0), Color(0.4, 0.9, 0.4))
-				var c2 := Models.mi(Models.box(Vector3(0.12, 0.05, 0.6)), Vector3(1.3 * sx, 0.11, 1.3 * sz - 0.24 * sz), Color(0.4, 0.9, 0.4))
+				var c1 := Models.mi(Models.box(Vector3(0.6, 0.05, 0.12)), Vector3(1.3 * sx, 0.11, 1.3 * sz - 0.0), Color(1.0, 0.82, 0.30))
+				var c2 := Models.mi(Models.box(Vector3(0.12, 0.05, 0.6)), Vector3(1.3 * sx, 0.11, 1.3 * sz - 0.24 * sz), Color(1.0, 0.82, 0.30))
 				Models.no_shadow(c1)
 				Models.no_shadow(c2)
 				p.node.add_child(c1)

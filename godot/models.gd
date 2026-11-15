@@ -535,15 +535,41 @@ static func barracks(level: int) -> Node3D:
 
 static func castle() -> Node3D:
 	var root := Node3D.new()
-	root.add_child(mi(box(Vector3(3.6, 1.7, 3.0)), Vector3(0, 0.85, 0), STONE))
-	root.add_child(mi(box(Vector3(0.95, 1.15, 0.1)), Vector3(0, 0.58, 1.52), Color(0.25, 0.17, 0.12)))
+	var stone_l := Color(0.74, 0.76, 0.82)
+	var stone_m := Color(0.62, 0.64, 0.71)
+	var stone_d := Color(0.46, 0.48, 0.56)
+	var roof := Color(0.20, 0.36, 0.86)
+	var roof_d := Color(0.14, 0.26, 0.66)
+	root.add_child(mi(box(Vector3(4.4, 0.35, 3.6)), Vector3(0, 0.17, 0), stone_d))
+	root.add_child(mi(box(Vector3(3.8, 1.9, 3.0)), Vector3(0, 1.3, 0), stone_m))
+	root.add_child(mi(box(Vector3(3.9, 0.16, 3.1)), Vector3(0, 2.3, 0), stone_l))
+	for k in 7:
+		var x := -1.65 + k * 0.55
+		for z in [-1.4, 1.4]:
+			root.add_child(mi(box(Vector3(0.3, 0.3, 0.3)), Vector3(x, 2.53, z), stone_l))
+	root.add_child(mi(box(Vector3(1.25, 1.5, 0.12)), Vector3(0, 1.1, 1.52), GOLD))
+	root.add_child(mi(box(Vector3(1.0, 1.25, 0.16)), Vector3(0, 1.0, 1.54), Color(0.22, 0.14, 0.10)))
+	root.add_child(mi(cyl(0.5, 0.5, 0.16, 10), Vector3(0, 1.62, 1.54), Color(0.22, 0.14, 0.10), Vector3(90, 0, 0)))
+	for k in 4:
+		root.add_child(mi(box(Vector3(0.05, 1.3, 0.05)), Vector3(-0.3 + k * 0.2, 1.0, 1.64), Color(0.5, 0.5, 0.55)))
+	for sx in [-1.0, 1.0]:
+		root.add_child(mi(box(Vector3(0.18, 0.5, 0.06)), Vector3(1.1 * sx, 1.5, 1.52), Color(0.12, 0.10, 0.16)))
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
-			root.add_child(mi(cyl(0.5, 0.58, 2.6, 8), Vector3(1.8 * sx, 1.3, 1.5 * sz), STONE))
-			root.add_child(mi(cyl(0.0, 0.78, 0.95, 8), Vector3(1.8 * sx, 3.05, 1.5 * sz), BLUE))
-	root.add_child(mi(box(Vector3(1.8, 1.4, 1.8)), Vector3(0, 2.4, 0), Color(0.64, 0.66, 0.72)))
-	root.add_child(mi(cyl(0.0, 1.45, 1.2, 4), Vector3(0, 3.7, 0), BLUE_D, Vector3(0, 45, 0)))
-	root.add_child(mi(cyl(0.04, 0.04, 1.3, 5), Vector3(0, 4.9, 0), WOOD))
-	root.add_child(mi(box(Vector3(0.8, 0.5, 0.05)), Vector3(0.42, 5.2, 0), BLUE))
-	root.add_child(mi(box(Vector3(0.12, 0.3, 0.12)), Vector3(0.0, 5.2, 0.05), GOLD))
+			var tx: float = 2.0 * sx
+			var tz: float = 1.6 * sz
+			root.add_child(mi(cyl(0.62, 0.7, 3.2, 10), Vector3(tx, 1.75, tz), stone_l))
+			root.add_child(mi(cyl(0.72, 0.72, 0.18, 10), Vector3(tx, 3.3, tz), stone_d))
+			root.add_child(mi(cyl(0.0, 0.85, 1.3, 10), Vector3(tx, 4.05, tz), roof))
+			root.add_child(mi(sphere(0.12, 6), Vector3(tx, 4.75, tz), GOLD))
+			root.add_child(mi(box(Vector3(0.1, 0.3, 0.05)), Vector3(tx, 2.4, tz + 0.64 * sz), Color(0.12, 0.10, 0.16)))
+	root.add_child(mi(box(Vector3(2.0, 1.9, 2.0)), Vector3(0, 3.2, -0.1), stone_l))
+	root.add_child(mi(box(Vector3(2.15, 0.16, 2.15)), Vector3(0, 4.2, -0.1), stone_d))
+	root.add_child(mi(cyl(0.0, 1.55, 1.5, 4), Vector3(0, 5.05, -0.1), roof_d, Vector3(0, 45, 0)))
+	root.add_child(mi(cyl(0.04, 0.04, 1.4, 5), Vector3(0, 6.5, -0.1), WOOD))
+	root.add_child(mi(box(Vector3(0.9, 0.55, 0.05)), Vector3(0.47, 6.8, -0.1), RED))
+	root.add_child(mi(sphere(0.1, 6), Vector3(0, 7.22, -0.1), GOLD))
+	root.add_child(mi(box(Vector3(0.4, 0.6, 0.06)), Vector3(0, 3.3, 0.93), Color(0.12, 0.10, 0.16)))
+	root.add_child(mi(box(Vector3(0.5, 0.8, 0.04)), Vector3(-0.65, 2.9, 0.93), RED))
+	root.add_child(mi(box(Vector3(0.5, 0.8, 0.04)), Vector3(0.65, 2.9, 0.93), RED))
 	return root
