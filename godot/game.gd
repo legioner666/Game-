@@ -11,6 +11,7 @@ signal next_level
 const Models = preload("res://models.gd")
 const I18n = preload("res://i18n.gd")
 const Settings = preload("res://settings.gd")
+const Progression = preload("res://progression.gd")
 const Boosts = preload("res://boosts.gd")
 const Spells = preload("res://spells.gd")
 const MeteorFX = preload("res://meteor_fx.gd")
@@ -1664,6 +1665,8 @@ func _update_towers(delta: float) -> void:
 			if p.cooldown <= 0.0 and absf(angle_difference(p.head.rotation.y, yaw)) < 0.3:
 				var cd: float = st["cd"][li]
 				var dmg: float = st["dmg"][li]
+				if not _autoplay and p.kind == "crossbow":
+					dmg *= Progression.multiplier("crossbow")
 				p.cooldown = cd
 				p.recoil = 1.0
 				var muzzle: Vector3 = p.tower.get_meta("muzzle")
@@ -1673,6 +1676,8 @@ func _update_towers(delta: float) -> void:
 					_snd("shoot", randf_range(0.95, 1.1))
 				else:
 					var aoe: float = st["aoe"][li]
+					if not _autoplay:
+						aoe *= Progression.multiplier("cannon")
 					_spawn_ball(from, tgt, dmg, aoe)
 					_snd("boom", 1.3)
 					_burst(from, 2, 4, 2.0, 2.0)
@@ -1694,7 +1699,9 @@ func _update_barracks(p: Plate, delta: float) -> void:
 			var a := Ally.new()
 			a.plate = p
 			a.pos = p.pos + Vector3(0, 0, 1.4)
-			a.max_hp = KIND["barracks"]["hp"][li]
+			a.max_hp = float(KIND["barracks"]["hp"][li])
+			if not _autoplay:
+				a.max_hp *= Progression.multiplier("barracks")
 			a.hp = a.max_hp
 			a.home = _rally + Vector3(randf_range(-1.3, 1.3), 0.0, randf_range(-1.0, 1.0))
 			a.phase = randf() * TAU
@@ -1887,7 +1894,9 @@ func _complete_plate(p: Plate) -> void:
 	if p.kind == "barracks":
 		for a in _allies:
 			if a.plate == p:
-				a.max_hp = KIND["barracks"]["hp"][p.level - 1]
+				a.max_hp = float(KIND["barracks"]["hp"][p.level - 1])
+				if not _autoplay:
+					a.max_hp *= Progression.multiplier("barracks")
 				a.hp = a.max_hp
 	_refresh_plate(p)
 	_rebuild_obstacles()
