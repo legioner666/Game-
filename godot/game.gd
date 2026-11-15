@@ -61,10 +61,12 @@ const E_SCALE := [1.1, 1.0, 1.0]
 const E_CONTACT_DPS := [4.0, 3.0, 14.0]
 const E_OFFSET := [0.9, 0.9, 0.35]
 
+## Максимальний рівень споруди (L4 «Майстерність» — сінк для золота після повної прокачки).
+const MAX_LV := 4
 const KIND := {
-	"crossbow": {"cost": [15, 25, 40], "range": [8.5, 9.0, 9.5], "dmg": [12.0, 18.0, 28.0], "cd": [0.7, 0.6, 0.5]},
-	"cannon": {"cost": [40, 60, 90], "range": [8.5, 9.0, 9.5], "dmg": [40.0, 65.0, 100.0], "cd": [2.2, 2.0, 1.8], "aoe": [2.0, 2.3, 2.6]},
-	"barracks": {"cost": [30, 45, 65], "cap": [3, 4, 6], "dmg": [8.0, 11.0, 15.0], "hp": [40.0, 60.0, 90.0]},
+	"crossbow": {"cost": [15, 25, 40, 70], "range": [8.5, 9.0, 9.5, 10.0], "dmg": [12.0, 18.0, 28.0, 44.0], "cd": [0.7, 0.6, 0.5, 0.42]},
+	"cannon": {"cost": [40, 60, 90, 130], "range": [8.5, 9.0, 9.5, 10.0], "dmg": [40.0, 65.0, 100.0, 150.0], "cd": [2.2, 2.0, 1.8, 1.55], "aoe": [2.0, 2.3, 2.6, 3.0]},
+	"barracks": {"cost": [30, 45, 65, 90], "cap": [3, 4, 6, 8], "dmg": [8.0, 11.0, 15.0, 21.0], "hp": [40.0, 60.0, 90.0, 130.0]},
 }
 # Група: [тип, кількість, старт (с), інтервал (с)]
 const LEVEL_MULT := [1.2, 4.4, 8.0]
@@ -1222,11 +1224,11 @@ func _vibrate(ms: int) -> void:
 
 func _plate_cost(p: Plate) -> int:
 	var costs: Array = KIND[p.kind]["cost"]
-	return costs[mini(p.level, 2)]
+	return costs[mini(p.level, MAX_LV - 1)]
 
 
 func _refresh_plate(p: Plate) -> void:
-	var maxed := p.level >= 3
+	var maxed := p.level >= MAX_LV
 	p.tile.visible = not maxed
 	p.label.visible = not maxed
 	p.icon.visible = not maxed
@@ -2007,7 +2009,7 @@ func _update_plates(delta: float) -> void:
 		var a := lerpf(p.label.modulate.a, 0.3 if near else 1.0, 1.0 - exp(-12.0 * delta))
 		p.label.modulate.a = a
 		p.sub_label.modulate.a = a
-		if p.level >= 3:
+		if p.level >= MAX_LV:
 			continue
 		var dx: float = p.pos.x - hp.x
 		var dz: float = p.pos.z - hp.z
@@ -2294,7 +2296,7 @@ func _bot_input() -> void:
 	var best: Plate = null
 	var best_rem := 1 << 30
 	for p in _plates:
-		if p.level >= 3:
+		if p.level >= MAX_LV:
 			continue
 		var rem: int = _plate_cost(p) - p.progress
 		if rem < best_rem and (rem <= _carried or p.progress > 0):
