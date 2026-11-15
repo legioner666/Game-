@@ -46,7 +46,7 @@ const DEPOSIT_INTERVAL := 0.045
 const COIN_LIFETIME := 14.0
 const BASE_HP_MAX := 20
 const MAX_ENEMIES := 600
-const MAX_COINS := 450
+const MAX_COINS := 260
 const STACK_VISIBLE := 40
 const ALLY_AGGRO := 7.0
 const ALLY_SPEED := 4.6
@@ -56,7 +56,7 @@ const E_HP := [60.0, 34.0, 500.0]
 const E_SPD_MIN := [2.0, 3.6, 1.2]
 const E_SPD_MAX := [2.6, 4.2, 1.5]
 const E_DMG := [1, 1, 5]
-const E_COINS := [2, 2, 14]
+const E_COINS := [1.6, 1.6, 11]
 const E_SCALE := [1.1, 1.0, 1.0]
 const E_CONTACT_DPS := [4.0, 3.0, 14.0]
 const E_OFFSET := [0.9, 0.9, 0.35]
@@ -335,6 +335,7 @@ var _pause_count := 0
 var _fps_sum := 0.0
 var _fps_n := 0
 var _fps_min := 999.0
+var _fps_win_frames := 0
 var _fps_t := 0.0
 var _frame_max := 0.0
 var _slow_frames := 0
@@ -1235,9 +1236,11 @@ func _process(delta: float) -> void:
 		if delta > 0.025:
 			_slow_frames += 1
 	_fps_t += delta
+	_fps_win_frames += 1
 	if _fps_t >= 1.0:
+		var fps := float(_fps_win_frames) / _fps_t
 		_fps_t = 0.0
-		var fps := Engine.get_frames_per_second()
+		_fps_win_frames = 0
 		_fps_sum += fps
 		_fps_n += 1
 		_fps_min = minf(_fps_min, fps)
@@ -1537,13 +1540,13 @@ func _furthest_in_range(from: Vector3, r: float) -> int:
 
 
 func _hit_base(dmg: int) -> void:
-	_wave_leaks += 1
-	_leaks_total += 1
 	if _boosts.consume_barrier():
 		Report.ev(_play_time, "barrier_block", "damage_prevented=%d" % dmg)
 		_burst(_base_pos + Vector3(0, 1.0, 0), 2, 8, 3.0, 3.0)
 		_snd("build", 0.85)
 		return
+	_wave_leaks += 1
+	_leaks_total += 1
 	_base_hp = maxi(0, _base_hp - dmg)
 	_shake = 0.6
 	_snd("hit")
@@ -1811,6 +1814,7 @@ func _spawn_coins(pos: Vector3, n: int) -> void:
 	for k in n:
 		if _coins.size() >= MAX_COINS:
 			_coins.remove_at(0)
+			_lost_coins += 1
 		var c := Coin.new()
 		c.pos = pos + Vector3(0, 0.6, 0)
 		var ang := randf() * TAU
@@ -2109,6 +2113,7 @@ func _render_stack() -> void:
 	_stack_label.visible = _carried > 0
 	_stack_label.text = "x%d" % _carried
 	_stack_label.position = base + Vector3(0, n * 0.1 + 0.8, 0)
+	_stack_label.position.x = clampf(_stack_label.position.x, _cam_x - 5.2, _cam_x + 5.2)
 
 
 func _update_hud() -> void:
