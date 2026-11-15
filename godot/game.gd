@@ -323,6 +323,9 @@ var _base_hp := BASE_HP_MAX
 var _time := 0.0
 var _play_time := 0.0
 var _paused := false
+const PERK_IDS := ["hero_dmg", "tower_rate", "tower_dmg", "heal", "coins", "spell"]
+var _perk := {"hero_dmg": 1.0, "tower_rate": 1.0, "tower_dmg": 1.0, "coins": 1.0, "spell": 1.0}
+var _perk_overlay: Control
 var _over := false
 var _built_any := false
 var _spent := 0
@@ -417,7 +420,9 @@ func _ready() -> void:
 	_rebuild_obstacles()
 	_run_id = Report.begin_run()
 	Report.ev(0.0, "level", "n=%d" % (level + 1))
-	if _show_kind != "":
+	if _show_kind == "perks":
+		_show_perks()
+	elif _show_kind != "":
 		_paused = true
 		_show_overlay(_show_kind)
 
@@ -1277,7 +1282,7 @@ func _step(delta: float) -> void:
 	_update_waves(delta)
 	if not _autoplay:
 		_boosts.tick(delta, _hero.position)
-		_spells.tick(delta)
+		_spells.tick(delta * float(_perk["spell"]))
 		_meteor_fx.tick(delta)
 	_update_hero(delta)
 	_update_enemies(delta)
@@ -1346,6 +1351,65 @@ func _wave_cleared() -> void:
 	_wave += 1
 	_phase = 0
 	_inter_t = 7.0
+	if not _autoplay:
+		_show_perks()
+
+
+## Вибір нагороди між хвилями: 3 випадкові з 6, гра на паузі до вибору.
+func _show_perks() -> void:
+	if _perk_overlay:
+		_perk_overlay.queue_free()
+	var ids: Array = PERK_IDS.duplicate()
+	ids.shuffle()
+	ids = ids.slice(0, 3)
+	_paused = true
+	_perk_overlay = Control.new()
+	_perk_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_ui.add_child(_perk_overlay)
+	var dim := ColorRect.new()
+	dim.color = Color(0.05, 0.1, 0.14, 0.82)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_perk_overlay.add_child(dim)
+	var box := VBoxContainer.new()
+	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	box.offset_left = -430
+	box.offset_right = 430
+	box.offset_top = -520
+	box.offset_bottom = 520
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 30)
+	_perk_overlay.add_child(box)
+	var title := _make_label(I18n.t("perk_title"), 86, Color(1.0, 0.85, 0.3))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+	var colors := {"hero_dmg": Color(0.80, 0.30, 0.25), "tower_rate": Color(0.25, 0.55, 0.80), "tower_dmg": Color(0.55, 0.42, 0.70), "heal": Color(0.30, 0.65, 0.40), "coins": Color(0.80, 0.62, 0.18), "spell": Color(0.30, 0.62, 0.70)}
+	for id in ids:
+		var b := _make_button(I18n.t("perk_" + str(id)), Vector2(0, 230), colors[id], 46)
+		var pid: String = str(id)
+		b.pressed.connect(func(): _pick_perk(pid))
+		box.add_child(b)
+
+
+func _pick_perk(id: String) -> void:
+	match id:
+		"hero_dmg":
+			_perk["hero_dmg"] = float(_perk["hero_dmg"]) * 1.3
+		"tower_rate":
+			_perk["tower_rate"] = float(_perk["tower_rate"]) * 1.15
+		"tower_dmg":
+			_perk["tower_dmg"] = float(_perk["tower_dmg"]) * 1.2
+		"coins":
+			_perk["coins"] = float(_perk["coins"]) * 1.25
+		"spell":
+			_perk["spell"] = float(_perk["spell"]) * 1.25
+		"heal":
+			_base_hp = mini(BASE_HP_MAX, _base_hp + 4)
+	Report.ev(_play_time, "perk", "id=%s wave=%d" % [id, _wave])
+	_snd("build", 1.5)
+	if _perk_overlay:
+		_perk_overlay.queue_free()
+		_perk_overlay = null
+	_paused = false
 
 
 func _finish(won: bool) -> void:
@@ -1508,7 +1572,7 @@ func _cleanup_enemies() -> void:
 			var t := e_type[i]
 			if killed:
 				var wp := Vector3(e_px[i], 0.0, e_pz[i])
-				var cn: float = E_COINS[t] * LEVEL_COIN[level] * _boosts.gold_multiplier()
+				var cn: float = E_COINS[t] * LEVEL_COIN[level] * _boosts.gold_multiplier() * float(_perk["coins"])
 				_spawn_coins(wp, int(cn) + (1 if randf() < cn - floorf(cn) else 0))
 				if not _autoplay:
 					_boosts.maybe_drop(wp)
@@ -1639,7 +1703,7 @@ func _update_hero_weapon(delta: float) -> void:
 		return
 	_hero_cd = HERO_CD
 	var fwd := Vector3(-sin(_hero_yaw), 0.0, -cos(_hero_yaw))
-	_spawn_arrow(_hero.position + fwd * 0.7 + Vector3(0, 1.1, 0), tgt, HERO_DMG)
+	_spawn_arrow(_hero.position + fwd * 0.7 + Vector3(0, 1.1, 0), tgt, HERO_DMG * float(_perk["hero_dmg"]))
 	_bow_kick = 1.0
 	_snd("hero_shoot", randf_range(0.95, 1.1))
 
@@ -1728,7 +1792,7 @@ func _update_towers(delta: float) -> void:
 		var st: Dictionary = KIND[p.kind]
 		var li: int = p.level - 1
 		var rng: float = st["range"][li]
-		p.cooldown -= delta * _boosts.tower_rate_multiplier()
+		p.cooldown -= delta * _boosts.tower_rate_multiplier() * float(_perk["tower_rate"])
 		p.recoil = maxf(0.0, p.recoil - delta * 7.0)
 		var tgt := _furthest_in_range(p.pos, rng)
 		if tgt >= 0 and p.head:
@@ -1736,7 +1800,7 @@ func _update_towers(delta: float) -> void:
 			p.head.rotation.y = lerp_angle(p.head.rotation.y, yaw, 1.0 - exp(-12.0 * delta))
 			if p.cooldown <= 0.0 and absf(angle_difference(p.head.rotation.y, yaw)) < 0.3:
 				var cd: float = st["cd"][li]
-				var dmg: float = st["dmg"][li]
+				var dmg: float = float(st["dmg"][li]) * float(_perk["tower_dmg"])
 				if not _autoplay and p.kind == "crossbow":
 					dmg *= Progression.multiplier("crossbow")
 				p.cooldown = cd
@@ -2236,7 +2300,7 @@ func hero_str(v: Vector3) -> String:
 func _check_shots() -> void:
 	if _shot_prefix == "" or _shot_idx >= _shot_times.size():
 		return
-	if _play_time >= float(_shot_times[_shot_idx]):
+	if Engine.get_process_frames() > 8 and _play_time >= float(_shot_times[_shot_idx]):
 		var img := get_viewport().get_texture().get_image()
 		img.save_png("%s_%d.png" % [_shot_prefix, int(_shot_times[_shot_idx])])
 		_shot_idx += 1
