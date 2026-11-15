@@ -459,13 +459,45 @@ static func hero() -> Node3D:
 	arm_r.add_child(mi(capsule(0.1, 0.62, 6, 2), Vector3(0, -0.25, 0), BLUE_D))
 	body.add_child(arm_r)
 
+	# руки з кистями; ліва тримає лук, права тягне тятиву
+	arm_l.add_child(mi(sphere(0.11, 6), Vector3(0, -0.56, 0), SKIN))
+	arm_r.add_child(mi(sphere(0.11, 6), Vector3(0, -0.56, 0), SKIN))
+	arm_l.rotation.y = -0.3
+
+	# лук: вигнутий, з потовщенням у руків'ї, золотими кінцями; площина YZ, тятива до гравця (+z)
 	var bow := Node3D.new()
-	bow.position = Vector3(-0.4, 1.05, -0.55)
-	bow.add_child(mi(box(Vector3(0.07, 0.24, 0.07)), Vector3.ZERO, WOOD))
-	bow.add_child(mi(box(Vector3(0.06, 0.5, 0.06)), Vector3(0, 0.34, -0.05), WOOD_L, Vector3(-18, 0, 0)))
-	bow.add_child(mi(box(Vector3(0.06, 0.5, 0.06)), Vector3(0, -0.34, -0.05), WOOD_L, Vector3(18, 0, 0)))
-	bow.add_child(mi(box(Vector3(0.015, 1.1, 0.015)), Vector3(0, 0, 0.1), Color(0.95, 0.95, 0.9)))
+	bow.position = Vector3(-0.24, 1.0, -0.52)
+	var bow_dark := Color(0.36, 0.22, 0.12)
+	var half := 0.72
+	var curve := 0.3
+	var segs := 8
+	for side in [-1.0, 1.0]:
+		for i in segs:
+			var y0: float = side * half * float(i) / segs
+			var y1: float = side * half * float(i + 1) / segs
+			var z0 := curve * pow(y0 / half, 2.0)
+			var z1 := curve * pow(y1 / half, 2.0)
+			var th := atan2(z1 - z0, y1 - y0)
+			var ln := Vector2(y1 - y0, z1 - z0).length() + 0.02
+			var w := lerpf(0.11, 0.06, float(i) / segs)
+			bow.add_child(mi(box(Vector3(w, ln, w)), Vector3(0, (y0 + y1) * 0.5, (z0 + z1) * 0.5), bow_dark if i < 2 else WOOD_L, Vector3(rad_to_deg(th), 0, 0)))
+		bow.add_child(mi(sphere(0.06, 5), Vector3(0, side * half, curve), GOLD))
+	bow.add_child(mi(box(Vector3(0.14, 0.3, 0.14)), Vector3(0, 0, 0), Color(0.55, 0.12, 0.12)))  # обмотка руків'я
+	var str_t := mi(box(Vector3(0.02, 1.0, 0.02)), Vector3.ZERO, Color(0.97, 0.95, 0.85))
+	var str_b := mi(box(Vector3(0.02, 1.0, 0.02)), Vector3.ZERO, Color(0.97, 0.95, 0.85))
+	bow.add_child(str_t)
+	bow.add_child(str_b)
+	var arrow := Node3D.new()
+	arrow.add_child(mi(box(Vector3(0.04, 0.04, 0.95)), Vector3(0, 0, -0.475), Color(0.85, 0.78, 0.62)))
+	arrow.add_child(mi(cyl(0.0, 0.07, 0.2, 5), Vector3(0, 0, -1.0), Color(0.78, 0.8, 0.85), Vector3(-90, 0, 0)))
+	arrow.add_child(mi(box(Vector3(0.12, 0.012, 0.16)), Vector3(0, 0, -0.05), Color(0.85, 0.2, 0.2)))
+	arrow.visible = false
+	bow.add_child(arrow)
+	bow.set_meta("str_t", str_t)
+	bow.set_meta("str_b", str_b)
+	bow.set_meta("arrow", arrow)
 	body.add_child(bow)
+	bow_pull(bow, 0.0)
 
 	root.set_meta("body", body)
 	root.set_meta("leg_l", leg_l)
@@ -586,3 +618,23 @@ static func castle() -> Node3D:
 	root.add_child(mi(box(Vector3(0.5, 0.8, 0.04)), Vector3(-0.65, 2.9, 0.93), RED))
 	root.add_child(mi(box(Vector3(0.5, 0.8, 0.04)), Vector3(0.65, 2.9, 0.93), RED))
 	return root
+
+
+## Тятива й стріла лука: pull 0..1 — натяг. Тятива — дві ланки від кінців до точки накладання.
+static func bow_pull(bow: Node3D, pull: float) -> void:
+	var half := 0.72
+	var curve := 0.3
+	var nz := curve + pull * 0.42
+	var tips := [Vector2(half, curve), Vector2(-half, curve)]
+	var names := ["str_t", "str_b"]
+	for i in 2:
+		var n := bow.get_meta(names[i]) as Node3D
+		var a: Vector2 = tips[i]
+		var b := Vector2(0.0, nz)
+		var d := b - a
+		n.position = Vector3(0, (a.x + b.x) * 0.5, (a.y + b.y) * 0.5)
+		n.scale = Vector3(1, d.length(), 1)
+		n.rotation = Vector3(atan2(d.y, d.x), 0, 0)
+	var arrow := bow.get_meta("arrow") as Node3D
+	arrow.visible = pull > 0.12
+	arrow.position = Vector3(0, 0, nz)

@@ -1684,12 +1684,20 @@ func _update_hero(delta: float) -> void:
 	# цикл пострілу: 1.0 = щойно випустив (віддача), 0.4..0 = натяг тятиви перед наступним
 	var draw := clampf(1.0 - _hero_cd / maxf(HERO_CD, 0.01), 0.0, 1.0) if tgt >= 0 else 0.0
 	var kick := _bow_kick * _bow_kick
-	(_hero.get_meta("bow") as Node3D).position.z = -0.55 + kick * 0.2 - draw * 0.04
-	(_hero.get_meta("bow") as Node3D).rotation.z = kick * 0.25
-	(_hero.get_meta("arm_l") as Node3D).rotation.x = 1.3 + kick * 0.25
-	if tgt >= 0:
-		# права рука натягує тятиву до плеча, потім різко відпускає
-		(_hero.get_meta("arm_r") as Node3D).rotation.x = lerpf(-sw * 0.9, 1.0, draw) - kick * 0.8
+	var aiming := tgt >= 0
+	var bow_n := _hero.get_meta("bow") as Node3D
+	Models.bow_pull(bow_n, draw if aiming else 0.0)
+	bow_n.rotation.x = -kick * 0.12
+	bow_n.position.z = -0.52 + kick * 0.12
+	(_hero.get_meta("arm_l") as Node3D).rotation.x = 1.3 + kick * 0.15
+	var arm_r := _hero.get_meta("arm_r") as Node3D
+	if aiming:
+		# права рука тягне тятиву до щоки і різко відпускає
+		var pull_amt := smoothstep(0.0, 0.5, draw)
+		arm_r.rotation.z = lerpf(arm_r.rotation.z, -1.25 * maxf(pull_amt, 0.55), 1.0 - exp(-25.0 * delta))
+		arm_r.rotation.x = lerpf(-sw * 0.9, 0.35, pull_amt)
+	else:
+		arm_r.rotation.z = lerpf(arm_r.rotation.z, 0.0, 1.0 - exp(-12.0 * delta))
 	body.rotation.x = kick * 0.12 - draw * 0.04
 	body.position.z = kick * 0.08
 
