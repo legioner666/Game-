@@ -373,6 +373,7 @@ var _stack_label: Label3D
 
 # тестові режими (аргументи після --)
 var _autoplay := false
+var _show_ui := false
 var _fast_steps := 1
 var _shot_prefix := ""
 var _shot_times: Array = []
@@ -402,7 +403,7 @@ func _ready() -> void:
 	_spells.setup(level)
 	_spells.spell_requested.connect(_on_spell_requested)
 	_spells.aim_cancelled.connect(_on_meteor_cancelled)
-	_spells.visible = not _autoplay
+	_spells.visible = (not _autoplay) or _show_ui
 	_meteor_fx = MeteorFX.new()
 	add_child(_meteor_fx)
 	_meteor_fx.impacted.connect(_on_meteor_impact)
@@ -418,6 +419,8 @@ func _parse_args() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a == "--autoplay":
 			_autoplay = true
+		elif a == "--ui":
+			_show_ui = true
 		elif a.begins_with("--show="):
 			_show_kind = a.substr(7)
 		elif a.begins_with("--coins="):
@@ -1220,7 +1223,7 @@ func _process(delta: float) -> void:
 		_render_all(delta)
 		_check_shots()
 		return
-	_spells.visible = not _autoplay
+	_spells.visible = (not _autoplay) or _show_ui
 	_frames += 1
 	if _play_time > 2.0:
 		_frame_max = maxf(_frame_max, delta)

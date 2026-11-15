@@ -24,6 +24,8 @@ jobs:
       - name: Install xvfb and mesa
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libglu1-mesa
       - name: Run bot and take screenshots
+        id: shots
+        continue-on-error: true
         run: playtest/run.sh out
       - name: Publish results to branch playtest/<ref>
         run: |
@@ -37,3 +39,8 @@ jobs:
           git config user.name "playtest-bot" && git config user.email "bot@users.noreply.github.com"
           git add -A && git commit -q -m "playtest $GITHUB_SHA"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "$BR"
+      - name: Fail if screenshots are missing
+        if: steps.shots.outcome == 'failure'
+        run: |
+          echo "::error::Не всі знімки створено, див. shots_log.txt у гілці playtest"
+          exit 1
