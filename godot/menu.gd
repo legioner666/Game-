@@ -216,10 +216,31 @@ func _build_levels(box: VBoxContainer) -> void:
 	var sp := Control.new()
 	sp.custom_minimum_size = Vector2(0, 40)
 	box.add_child(sp)
+	# Вибір складності: наступна відкривається після проходження всіх рівнів попередньої
+	var drow := HBoxContainer.new()
+	drow.add_theme_constant_override("separation", 14)
+	box.add_child(drow)
+	var dcol := [Color("#4f8a5a"), Color("#b7742c"), Color("#9c3b3b")]
+	for d in Settings.DIFF_COUNT:
+		var dopen := Settings.diff_unlocked(d)
+		var sel := d == Settings.difficulty
+		var db := _button(I18n.t("diff_%d" % d), dcol[d] if sel else Color("#33434f"), 120, 40)
+		db.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		db.disabled = not dopen
+		var dd := d
+		db.pressed.connect(func():
+			Settings.difficulty = dd
+			Settings.save_settings()
+			_go("levels"))
+		drow.add_child(db)
+	var diff: int = Settings.difficulty
+	if not Settings.diff_unlocked(mini(diff + 1, Settings.DIFF_COUNT - 1)):
+		box.add_child(_label(I18n.t("diff_unlock_hint"), 36))
+	box.add_child(_label(I18n.t("mastery_now") % Progression.mastery_percent(), 40, Color("#9fd8c4")))
 	for lv in Settings.LEVEL_COUNT:
-		var open := Settings.unlocked(lv)
+		var open := Settings.unlocked(lv, diff)
 		var row := Control.new()
-		row.custom_minimum_size = Vector2(0, 250)
+		row.custom_minimum_size = Vector2(0, 230)
 		box.add_child(row)
 		var b := _button((I18n.t("level") % (lv + 1)) + " · " + I18n.t(Levels.data(lv)["name"]), Color("#E8B547") if open else Color("#3a4650"), 190, 56)
 		b.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -230,8 +251,16 @@ func _build_levels(box: VBoxContainer) -> void:
 			_click()
 			play_pressed.emit(l))
 		row.add_child(b)
+		var need: int = Progression.RECOMMENDED[diff][lv]
+		if open and need > 0:
+			var rec := _label(I18n.t("mastery_need") % need, 34, Color("#8fe0a8") if Progression.mastery_percent() >= need else Color("#ff9a8a"))
+			rec.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+			rec.offset_top = -52
+			rec.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			rec.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			row.add_child(rec)
 		if open:
-			var st := StarRow.new(int(Settings.stars[lv]), 44.0)
+			var st := StarRow.new(Settings.stars_of(lv, diff), 44.0)
 			st.anchor_left = 0.5
 			st.anchor_right = 0.5
 			st.anchor_top = 1.0
@@ -250,24 +279,26 @@ func _build_levels(box: VBoxContainer) -> void:
 func _build_workshop(box: VBoxContainer) -> void:
 	box.add_child(_label(I18n.t("workshop"), 92, Color("#F8D874")))
 	box.add_child(_label(I18n.t("tech_points") % [Progression.available_points(), Progression.earned_points()], 52))
-	box.add_child(_label(I18n.t("tech_help"), 42))
+	box.add_child(_label(I18n.t("mastery_now") % Progression.mastery_percent(), 44, Color("#9fd8c4")))
+	box.add_child(_label(I18n.t("tech_help"), 38))
 	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 30)
+	spacer.custom_minimum_size = Vector2(0, 10)
 	box.add_child(spacer)
 	for kind in Progression.KINDS:
 		var current_rank: int = Progression.rank(kind)
 		var next_cost: int = Progression.next_price(kind)
 		var cost_label: String = I18n.t("tech_max") if next_cost == 0 else I18n.t("tech_cost") % next_cost
 		var label_text := "%s  %d/%d · %s" % [I18n.t(kind), current_rank, Progression.MAX_RANK, cost_label]
-		var button := _button(label_text, Color("#386f63") if Progression.can_buy(kind) else Color("#354956"), 140, 44)
+		var button := _button(label_text, Color("#386f63") if Progression.can_buy(kind) else Color("#354956"), 112, 40)
 		button.disabled = not Progression.can_buy(kind)
 		var upgrade_kind: String = kind
 		button.pressed.connect(func():
 			if Progression.buy(upgrade_kind):
 				_go("workshop"))
 		box.add_child(button)
-		var percent: int = 6 * current_rank if kind == "crossbow" else (5 * current_rank if kind == "cannon" else 8 * current_rank)
-		box.add_child(_label(I18n.t("tech_" + kind + "_desc") % percent, 39))
+		var amount: int = Progression.CASTLE_HP_STEP * current_rank if kind == "castle" else int(Progression.STEP_PERCENT[kind]) * current_rank
+		var top: int = Progression.CASTLE_HP_STEP * Progression.MAX_RANK if kind == "castle" else int(Progression.STEP_PERCENT[kind]) * Progression.MAX_RANK
+		box.add_child(_label((I18n.t("tech_" + kind + "_desc") % amount) + (I18n.t("tech_upto") % top), 36))
 	if Progression.spent_points() > 0:
 		var reset := _button(I18n.t("tech_reset"), Color("#6b4c3d"), 115, 46)
 		reset.pressed.connect(func():
