@@ -82,7 +82,11 @@ static func text() -> String:
 	if FileAccess.file_exists(PATH):
 		var r := FileAccess.open(PATH, FileAccess.READ)
 		if r:
-			out += r.get_as_text()
+			# лише 3 останні забіги: інакше звіт не влазить у буфер обміну
+			var runs := r.get_as_text().split("--- run ---\n", false)
+			var from := maxi(0, runs.size() - 3)
+			for i in range(from, runs.size()):
+				out += "--- run ---\n" + runs[i]
 	if _active and _lines.size() > 0:
 		out += "--- run (in progress) ---\n" + "\n".join(_lines) + "\n"
 	return out
