@@ -2235,6 +2235,11 @@ func _update_hud() -> void:
 	_wave_label.text = I18n.t("wave") % [mini(_wave + 1, _waves.size()), _waves.size()]
 	if _phase == 0:
 		_sub_label.text = I18n.t("next_wave") % maxi(1, int(ceil(_inter_t)))
+		if _wave < _waves.size():
+			var cnt := [0, 0, 0]
+			for g in _waves[_wave]:
+				cnt[int(g[0])] += int(g[1])
+			_sub_label.text += "\n" + I18n.t("preview") % cnt
 	else:
 		_sub_label.text = ""
 	if _built_any and _hint_label.visible:

@@ -47,6 +47,7 @@ const STR := {
 	"perk_heal": {"uk": "Ремонт стін\nЗамок +4 здоров'я", "en": "Wall repair\nCastle +4 health"},
 	"perk_coins": {"uk": "Золота жила\nЗолота з ворогів +25%", "en": "Gold vein\nEnemy gold +25%"},
 	"perk_spell": {"uk": "Мудрість магів\nСпели відновлюються на 25% швидше", "en": "Mage wisdom\nSpells recharge 25% faster"},
+	"preview": {"uk": "Йдуть: бійців %d · бігунів %d · броньованих %d", "en": "Incoming: grunts %d · runners %d · brutes %d"},
 	"wave_clear": {"uk": "Хвилю відбито! +%d", "en": "Wave cleared! +%d"},
 	"base": {"uk": "Замок", "en": "Castle"},
 	"stop_hint": {"uk": "Зупинись, щоб будувати", "en": "Stop to build"},
