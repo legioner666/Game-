@@ -9,6 +9,8 @@ const Models = preload("res://models.gd")
 const TYPES := ["haste", "frenzy", "gold", "barrier"]
 const DURATION := 11.0
 const DROP_CHANCE := 0.04
+## Мінімальна пауза між випадіннями: на великих хвилях бонуси не мають сипатися безперервно.
+const DROP_COOLDOWN := 10.0
 const PICKUP_LIFE := 14.0
 const PICKUP_RADIUS := 2.3
 const MAX_PICKUPS := 12
@@ -55,6 +57,7 @@ var _time: Dictionary = {
 	"haste": 0.0, "frenzy": 0.0, "gold": 0.0, "barrier": 0.0,
 }
 var _barrier_hits := 0
+var _drop_cd := 0.0
 var _pickups: Array[Dictionary] = []
 var _pickup_mesh: SphereMesh
 var _materials: Dictionary = {}
@@ -155,8 +158,9 @@ func _icon(kind: String) -> Node3D:
 
 
 func maybe_drop(pos: Vector3) -> void:
-	if _pickups.size() >= MAX_PICKUPS or randf() >= DROP_CHANCE:
+	if _drop_cd > 0.0 or _pickups.size() >= MAX_PICKUPS or randf() >= DROP_CHANCE:
 		return
+	_drop_cd = DROP_COOLDOWN
 	_spawn_pickup(TYPES[randi_range(0, TYPES.size() - 1)], pos)
 
 
@@ -190,6 +194,7 @@ func _spawn_pickup(kind: String, pos: Vector3) -> void:
 
 
 func tick(delta: float, hero: Vector3) -> void:
+	_drop_cd = maxf(0.0, _drop_cd - delta)
 	for kind in TYPES:
 		var remaining: float = float(_time[kind])
 		if remaining > 0.0:
@@ -240,7 +245,7 @@ func _update_hud() -> void:
 
 
 func tower_rate_multiplier() -> float:
-	return 2.0 if float(_time["haste"]) > 0.0 else 1.0
+	return 1.5 if float(_time["haste"]) > 0.0 else 1.0
 
 
 func hero_rate_multiplier() -> float:
@@ -248,7 +253,7 @@ func hero_rate_multiplier() -> float:
 
 
 func gold_multiplier() -> float:
-	return 2.0 if float(_time["gold"]) > 0.0 else 1.0
+	return 1.5 if float(_time["gold"]) > 0.0 else 1.0
 
 
 func consume_barrier() -> bool:
