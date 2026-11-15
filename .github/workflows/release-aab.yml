@@ -1,0 +1,167 @@
+name: Release AAB (Play candidate)
+
+# Збирає AAB із Gradle, target API 36, перевіряє маніфест bundletool-ом.
+# Підпис: якщо задані секрети ANDROID_RELEASE_KEYSTORE_B64 / _ALIAS / _PASSWORD — релізний ключ;
+# інакше збирається ТІЛЬКИ валідаційний AAB, підписаний debug-ключем (НЕ для Google Play).
+# Приватні ключі ніколи не потрапляють у репозиторій, лог чи реліз.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/prerelease-**", "release/**"]
+    paths:
+      - "godot/**"
+      - ".github/workflows/release-aab.yml"
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: "4.4.1"
+  TARGET_SDK: "36"
+  BUNDLETOOL_VERSION: "1.18.1"
+
+jobs:
+  aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Godot and export templates
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+          include-templates: true
+
+      - name: Install Android SDK components (API 36)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" "build-tools;35.0.1" "build-tools;36.0.0" \
+            "platforms;android-35" "platforms;android-36" "cmdline-tools;latest"
+
+      - name: Configure Godot
+        run: |
+          mkdir -p ~/.config/godot
+          cat > ~/.config/godot/editor_settings-4.4.tres <<EOT
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          EOT
+
+      - name: Install Gradle build template and raise SDK to ${{ env.TARGET_SDK }}
+        run: |
+          TPL=$(find ~/.local/share/godot/export_templates -name android_source.zip | head -1)
+          test -n "$TPL" || { echo "android_source.zip not found"; exit 1; }
+          mkdir -p godot/android/build
+          unzip -q "$TPL" -d godot/android/build
+          echo "$GODOT_VERSION.stable" > godot/android/.build_version
+          touch godot/android/build/.gdignore
+          CFG=godot/android/build/config.gradle
+          echo "--- config.gradle before"; grep -nE "compileSdk|targetSdk|buildTools|androidGradlePlugin" "$CFG"
+          sed -i -E "s/(compileSdk[[:space:]]*:[[:space:]]*)[0-9]+/\1$TARGET_SDK/; s/(targetSdk[[:space:]]*:[[:space:]]*)[0-9]+/\1$TARGET_SDK/; s/(buildTools[[:space:]]*:[[:space:]]*)'[0-9.]+'/\1'36.0.0'/" "$CFG"
+          echo "--- config.gradle after"; grep -nE "compileSdk|targetSdk|buildTools|androidGradlePlugin" "$CFG"
+          echo "android.suppressUnsupportedCompileSdk=$TARGET_SDK" >> godot/android/build/gradle.properties
+
+      - name: Set versionCode from run number
+        run: |
+          python3 - <<'PY'
+          import os,re
+          p="godot/export_presets.cfg"
+          s=open(p).read()
+          head,tail=s.split("[preset.1.options]")
+          tail=re.sub(r"version/code=\d+","version/code=%d"%(100+int(os.environ["GITHUB_RUN_NUMBER"])),tail,count=1)
+          open(p,"w").write(head+"[preset.1.options]"+tail)
+          PY
+          grep -n "version/code" godot/export_presets.cfg
+
+      - name: Import project (fails on script errors)
+        run: |
+          mkdir -p godot/build
+          godot --headless --path godot --import 2>&1 | tee import.log
+          if grep -E "SCRIPT ERROR|Parse Error" import.log; then echo "::error::script errors during import"; exit 1; fi
+
+      - name: Export AAB
+        id: export
+        env:
+          RELEASE_KS_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_B64 }}
+          RELEASE_KS_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          RELEASE_KS_PASS: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$RELEASE_KS_B64" ] && [ -n "$RELEASE_KS_ALIAS" ] && [ -n "$RELEASE_KS_PASS" ]; then
+            echo "$RELEASE_KS_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            export GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$RUNNER_TEMP/release.keystore"
+            export GODOT_ANDROID_KEYSTORE_RELEASE_USER="$RELEASE_KS_ALIAS"
+            export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="$RELEASE_KS_PASS"
+            godot --headless --path godot --export-release "Android Release" build/crown-rush.aab
+            mv godot/build/crown-rush.aab godot/build/crown-rush-release-signed.aab
+            echo "mode=release" >> "$GITHUB_OUTPUT"
+            echo "aab=godot/build/crown-rush-release-signed.aab" >> "$GITHUB_OUTPUT"
+          else
+            export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$GITHUB_WORKSPACE/.github/debug.keystore"
+            export GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey
+            export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android
+            godot --headless --path godot --export-debug "Android Release" build/crown-rush.aab
+            mv godot/build/crown-rush.aab godot/build/crown-rush-VALIDATION-debug-signed-NOT-FOR-PLAY.aab
+            echo "mode=validation" >> "$GITHUB_OUTPUT"
+            echo "aab=godot/build/crown-rush-VALIDATION-debug-signed-NOT-FOR-PLAY.aab" >> "$GITHUB_OUTPUT"
+          fi
+          ls -la godot/build
+
+      - name: Validate AAB with bundletool
+        env:
+          AAB: ${{ steps.export.outputs.aab }}
+          MODE: ${{ steps.export.outputs.mode }}
+        run: |
+          curl -sSL -o bt.jar "https://github.com/google/bundletool/releases/download/$BUNDLETOOL_VERSION/bundletool-all-$BUNDLETOOL_VERSION.jar"
+          java -jar bt.jar dump manifest --bundle="$AAB" > manifest.txt
+          {
+            echo "# AAB validation"
+            echo "- mode: **$MODE** $( [ "$MODE" = validation ] && echo '(debug-signed, NOT for Google Play)')"
+            echo "- file: $(basename "$AAB"), size $(stat -c%s "$AAB") bytes, sha256 $(sha256sum "$AAB" | cut -d' ' -f1)"
+            echo "- commit: $GITHUB_SHA"
+            echo '```'
+            grep -E "package=|versionCode|versionName|targetSdkVersion|minSdkVersion|uses-permission|debuggable" manifest.txt
+            echo '```'
+          } | tee validation.md
+          grep -q "android:targetSdkVersion=\"$TARGET_SDK\"" manifest.txt || { echo "::error::targetSdk is not $TARGET_SDK"; exit 1; }
+          if grep -q 'android:debuggable="true"' manifest.txt && [ "$MODE" = release ]; then echo "::error::release AAB is debuggable"; exit 1; fi
+          cat validation.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build universal APK from AAB (install test)
+        env:
+          AAB: ${{ steps.export.outputs.aab }}
+        run: |
+          java -jar bt.jar build-apks --bundle="$AAB" --output=out.apks --mode=universal \
+            --ks="$GITHUB_WORKSPACE/.github/debug.keystore" --ks-pass=pass:android --ks-key-alias=androiddebugkey --key-pass=pass:android
+          unzip -o -q out.apks universal.apk
+          mv universal.apk godot/build/crown-rush-aab-universal-debugsigned.apk
+          ls -la godot/build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crown-rush-aab-${{ steps.export.outputs.mode }}
+          path: |
+            ${{ steps.export.outputs.aab }}
+            godot/build/crown-rush-aab-universal-debugsigned.apk
+            validation.md
+            manifest.txt
+
+      - name: Publish validation release (APK only; AAB stays a private artifact)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="rc-$(echo "$GITHUB_REF_NAME" | tr '/' '-')"
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release create "$TAG" godot/build/crown-rush-aab-universal-debugsigned.apk validation.md \
+            --target "$GITHUB_SHA" --prerelease --title "Release candidate: $GITHUB_REF_NAME" \
+            --notes "Кандидат у реліз із AAB-конвеєра (target API $TARGET_SDK). APK тут підписаний debug-ключем для QA; AAB — у артефактах запуску workflow. Див. validation.md."

@@ -6,6 +6,8 @@ config_version=5
 config/name="Crown Rush"
 run/main_scene="res://main.tscn"
 run/quit_on_go_back=false
+config/icon="res://icon/icon.png"
+config/version="1.0.0"
 config/features=PackedStringArray("4.4", "Mobile")
 
 [display]
