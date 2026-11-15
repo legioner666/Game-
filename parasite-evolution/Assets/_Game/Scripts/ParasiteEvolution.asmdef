@@ -1,0 +1,6 @@
+{
+  "name": "ParasiteEvolution",
+  "rootNamespace": "ParasiteEvolution",
+  "references": ["Unity.InputSystem", "UnityEngine.UI"],
+  "autoReferenced": true
+}

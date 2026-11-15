@@ -1,0 +1,7 @@
+{
+  "name": "ParasiteEvolution.Tests",
+  "references": ["ParasiteEvolution"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}
