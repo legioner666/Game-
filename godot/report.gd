@@ -6,7 +6,7 @@ extends RefCounted
 
 const PATH := "user://report.log"
 const ID_PATH := "user://report_id.txt"
-const MAX_BYTES := 40000
+const MAX_RUNS := 3
 const VERSION := "0.3"
 
 static var _lines: Array = []
@@ -65,28 +65,29 @@ static func end_run(result: String) -> void:
 		var r := FileAccess.open(PATH, FileAccess.READ)
 		if r:
 			old = r.get_as_text()
-	var all := old + "--- run ---\n" + "\n".join(_lines) + "\n"
-	if all.length() > MAX_BYTES:
-		all = all.substr(all.length() - MAX_BYTES)
-		var cut := all.find("--- run ---")
-		if cut > 0:
-			all = all.substr(cut)
+	var all := _last_runs(old + "--- run ---\n" + "\n".join(_lines) + "\n", MAX_RUNS)
 	var w := FileAccess.open(PATH, FileAccess.WRITE)
 	if w:
 		w.store_string(all)
 	_lines.clear()
 
 
+## Залишає лише n останніх повних забігів (кожен починається з "--- run ---").
+static func _last_runs(raw: String, n: int) -> String:
+	var runs := raw.split("--- run ---\n", false)
+	var out := ""
+	for i in range(maxi(0, runs.size() - n), runs.size()):
+		out += "--- run ---\n" + runs[i]
+	return out
+
+
 static func text() -> String:
 	var out := "Crown Rush report v%s id=%s\n" % [VERSION, anon_id()]
+	var keep := MAX_RUNS - (1 if (_active and _lines.size() > 0) else 0)
 	if FileAccess.file_exists(PATH):
 		var r := FileAccess.open(PATH, FileAccess.READ)
 		if r:
-			# лише 3 останні забіги: інакше звіт не влазить у буфер обміну
-			var runs := r.get_as_text().split("--- run ---\n", false)
-			var from := maxi(0, runs.size() - 3)
-			for i in range(from, runs.size()):
-				out += "--- run ---\n" + runs[i]
+			out += _last_runs(r.get_as_text(), keep)
 	if _active and _lines.size() > 0:
 		out += "--- run (in progress) ---\n" + "\n".join(_lines) + "\n"
 	return out
