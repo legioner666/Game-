@@ -56,7 +56,7 @@ const E_HP := [60.0, 34.0, 500.0]
 const E_SPD_MIN := [2.0, 3.6, 1.2]
 const E_SPD_MAX := [2.6, 4.2, 1.5]
 const E_DMG := [1, 1, 5]
-const E_COINS := [1.6, 1.6, 11]
+const E_COINS := [1.3, 1.3, 9]
 const E_SCALE := [1.1, 1.0, 1.0]
 const E_CONTACT_DPS := [4.0, 3.0, 14.0]
 const E_OFFSET := [0.9, 0.9, 0.35]
@@ -67,13 +67,13 @@ const KIND := {
 	"barracks": {"cost": [30, 45, 65], "cap": [3, 4, 6], "dmg": [8.0, 11.0, 15.0], "hp": [40.0, 60.0, 90.0]},
 }
 # Група: [тип, кількість, старт (с), інтервал (с)]
-const LEVEL_MULT := [1.2, 3.8, 5.6]
+const LEVEL_MULT := [1.2, 4.4, 8.0]
 const LEVEL_START_MULT := [1.0, 1.3, 1.35]
-const LEVEL_HP := [1.0, 1.3, 1.5]
+const LEVEL_HP := [1.0, 1.4, 1.8]
 const LEVEL_SPD := [1.0, 1.04, 1.06]
 const LEVEL_COIN := [1.0, 1.0, 1.1]
 const LEVEL_START := [15, 20, 30]
-const LEVEL_BRUTES := [1, 5, 9]
+const LEVEL_BRUTES := [1, 6, 12]
 const WAVES := [
 	[[0, 7, 0.0, 1.2]],
 	[[0, 11, 0.0, 1.0], [1, 4, 4.0, 1.8]],

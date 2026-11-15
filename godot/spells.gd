@@ -6,11 +6,11 @@ signal spell_requested(kind: String)
 signal aim_cancelled
 
 const I18n = preload("res://i18n.gd")
-const FREEZE_CD := 30.0
-const METEOR_CD := 25.0
+const FREEZE_CD := 45.0
+const METEOR_CD := 40.0
 const FREEZE_SECONDS := 5.0
 const METEOR_RADIUS := 3.8
-const METEOR_DAMAGE := 150.0
+const METEOR_DAMAGE := 110.0
 const CELL := 4.0
 
 class Glyph extends Control:

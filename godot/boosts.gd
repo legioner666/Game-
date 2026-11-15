@@ -7,7 +7,7 @@ signal picked(kind: String)
 const I18n = preload("res://i18n.gd")
 const TYPES := ["haste", "frenzy", "gold", "barrier"]
 const DURATION := 11.0
-const DROP_CHANCE := 0.05
+const DROP_CHANCE := 0.025
 const PICKUP_LIFE := 14.0
 const PICKUP_RADIUS := 2.3
 const MAX_PICKUPS := 12
