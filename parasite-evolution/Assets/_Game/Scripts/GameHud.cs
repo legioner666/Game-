@@ -11,7 +11,7 @@ namespace ParasiteEvolution
         RectTransform safe;
         Font font;
         VirtualJoystick joystick;
-        Text stats,quest,toast,modalTitle,modalQuest;
+        Text stats,quest,toast,modalTitle,modalQuest,relayText;
         Text[] abilityText=new Text[3],upgradeText=new Text[6],unlockText=new Text[2];
         Button[] abilityButtons=new Button[3];
         GameObject modal,shop,pause;
@@ -67,9 +67,12 @@ namespace ParasiteEvolution
                 var button=ButtonAt(shop.transform,"",new Vector2(1,1),new Vector2(-235,-135-i*83),new Vector2(390,70),()=>session.Unlock(id));
                 unlockText[i]=button.GetComponentInChildren<Text>();
             }
-            modalQuest=Label(shop.transform,"",21,TextAnchor.MiddleCenter,new Vector2(1,1),new Vector2(1,1),
-                new Vector2(-235,-330),new Vector2(390,120));
-            ButtonAt(shop.transform,"Отримати нагороду",new Vector2(1,1),new Vector2(-235,-430),new Vector2(390,56),()=>session.ClaimQuest());
+            var relayButton=ButtonAt(shop.transform,"",new Vector2(1,1),new Vector2(-235,-292),
+                new Vector2(390,58),()=>session.BuyRelay());
+            relayText=relayButton.GetComponentInChildren<Text>();
+            modalQuest=Label(shop.transform,"",19,TextAnchor.MiddleCenter,new Vector2(1,1),new Vector2(1,1),
+                new Vector2(-235,-385),new Vector2(390,84));
+            ButtonAt(shop.transform,"Отримати нагороду",new Vector2(1,1),new Vector2(-235,-476),new Vector2(390,52),()=>session.ClaimQuest());
             pause=new GameObject("Pause",typeof(RectTransform));pause.transform.SetParent(modal.transform,false);
             Label(pause.transform,"Продовжити дослідження",25,TextAnchor.MiddleCenter,new Vector2(.5f,.5f),new Vector2(.5f,.5f),Vector2.zero,new Vector2(650,140));
             ButtonAt(modal.transform,"Продовжити",new Vector2(.5f,0),new Vector2(0,42),new Vector2(300,52),()=>session.ClosePanel());
@@ -91,6 +94,7 @@ namespace ParasiteEvolution
             stats.text="HP "+Mathf.CeilToInt(session.Player.Health)+"/"+Balance.MaxHealth(p)+
                 "   Геном "+p.bank+"   Біомаса "+Balance.LevelProgress(p)+"/"+(Balance.Level(p)*30)+
                 "   Рівень "+Balance.Level(p)+"\nВантаж "+p.cargoUnits+"/"+Balance.Capacity(p)+" (+"+p.cargoValue+" геному)"+
+                (p.relayLevel>0?"   Реле "+Mathf.CeilToInt(session.RelayRemaining)+" с":"")+
                 (session.InSafe?"   Сейв-зона":"   Небезпека зони "+zone);
             var stage=p.questStage;
             var text=stage<questNames.Length?questNames[stage]+" · "+Mathf.Min(Balance.QuestProgress(p),Balance.QuestGoals[stage])+"/"+Balance.QuestGoals[stage]:"Досліджуй світ і розвивай організм";
@@ -113,6 +117,10 @@ namespace ParasiteEvolution
             }
             for(var i=0;i<2;i++)unlockText[i].text=abilityNames[i+1]+"\n"+
                 (p.abilities.Contains(abilityIds[i+1])?"Відкрито":"Відкрити за "+Balance.AbilityPrice(abilityIds[i+1])+" геному");
+            relayText.text="Органічне реле "+p.relayLevel+"/2\n"+
+                (Balance.Level(p)<2?"Відкривається на рівні 2":
+                    Balance.RelayPrice(p)<0?"Максимум":
+                    "Ціна: "+Balance.RelayPrice(p)+" геному");
         }
         void FitSafeArea()
         {

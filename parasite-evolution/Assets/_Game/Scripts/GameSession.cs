@@ -16,11 +16,12 @@ namespace ParasiteEvolution
         public bool ShopOpen { get; private set; }
         public string FatalError { get; private set; }
         public bool InSafe => Player!=null&&WorldBuilder.IsSafe(Player.transform.position);
+        public float RelayRemaining => relayRemaining;
         public string Toast { get; private set; }
         public float ToastUntil { get; private set; }
         ProfileStore store;
         Camera cameraView;
-        float saveTimer,castLock;
+        float saveTimer,castLock,relayRemaining;
         bool baseLatch,dying;
         readonly List<EnemyActor> targets=new List<EnemyActor>();
 
@@ -39,6 +40,7 @@ namespace ParasiteEvolution
             try
             {
                 store=new ProfileStore(Path.Combine(Application.persistentDataPath,"parasite-profile.json"));
+                relayRemaining=store.Current.relayRemaining;
                 new WorldBuilder(this);
                 Player=new GameObject("Slime organism").AddComponent<SlimeActor>();Player.Initialize(this);
                 cameraView=new GameObject("Camera").AddComponent<Camera>();
@@ -56,6 +58,7 @@ namespace ParasiteEvolution
         {
             if(Paused||Player==null)return;
             var dt=Time.deltaTime;castLock=Mathf.Max(0,castLock-dt);saveTimer+=dt;
+            relayRemaining=Mathf.Max(0,relayRemaining-dt);
             var safe=InSafe;
             if(safe)
             {
@@ -72,12 +75,30 @@ namespace ParasiteEvolution
             Player.Visual.WorkTargets.Clear();
             if(!safe)
             {
-                FindTargets(Balance.Radius(Profile));
+                // Organic relay moves already captured cargo, avoiding repetitive walks to base.
+                // It cannot create resources and is idle while the game is paused.
+                if(Profile.relayLevel>0&&relayRemaining<=0&&Profile.cargoUnits>0)
+                {
+                    var delivered=Profile.cargoValue;
+                    if(Transact(p=>
+                    {
+                        if(!Economy.RelayTransfer(p))return false;
+                        p.relayRemaining=Balance.RelayInterval(p);
+                        return true;
+                    }))
+                    {
+                        relayRemaining=Profile.relayRemaining;
+                        Note("Органічне реле передало: +"+delivered+" геному");
+                    }
+                }
+                if(Paused)return;
+                FindTargets(Balance.Radius(Profile),true);
                 var channels=Balance.Channels(Profile);
                 for(var i=0;i<targets.Count&&i<channels;i++)
                 {
                     var enemy=targets[i];
-                    if(enemy.Units>Balance.Capacity(Profile)-Profile.cargoUnits)continue;
+                    // Capacity can change during this tick when a previous capture completes.
+                    if(!Balance.CanCarry(Profile,enemy.Units))continue;
                     Player.Visual.WorkTargets.Add(enemy.transform.position+Vector3.up*.65f);
                     enemy.Damage(Balance.CaptureDamage(Profile)*dt);
                     if(Paused)break;
@@ -94,11 +115,12 @@ namespace ParasiteEvolution
             var desired=Player.transform.position+new Vector3(0,19,-14);
             cameraView.transform.position=Vector3.Lerp(cameraView.transform.position,desired,1-Mathf.Exp(-7*Time.deltaTime));
         }
-        void FindTargets(float radius)
+        void FindTargets(float radius,bool mustFit=false)
         {
             targets.Clear();
             foreach(var enemy in Enemies)
-                if(enemy.Alive&&Vector3.Distance(Player.transform.position,enemy.transform.position)<=radius&&
+                if(enemy.Alive&&(!mustFit||Balance.CanCarry(Profile,enemy.Units))&&
+                    Vector3.Distance(Player.transform.position,enemy.transform.position)<=radius&&
                     WorldBuilder.ClearLine(Player.transform.position,enemy.transform.position))targets.Add(enemy);
             targets.Sort((a,b)=>(a.transform.position-Player.transform.position).sqrMagnitude.CompareTo(
                 (b.transform.position-Player.transform.position).sqrMagnitude));
@@ -122,7 +144,7 @@ namespace ParasiteEvolution
             if(id=="AB-PULL")
             {
                 if(Player.PullRemaining>0)return;
-                FindTargets(8);
+                FindTargets(8,true);
                 if(targets.Count==0){Note("Немає доступної цілі.");return;}
                 targets[0].Pull();Player.PullRemaining=Balance.PullCooldown;
             }
@@ -156,6 +178,7 @@ namespace ParasiteEvolution
             p.x=Player.transform.position.x;p.z=Player.transform.position.z;
             p.health=Mathf.Clamp(Player.Health,0,Balance.MaxHealth(p));
             p.pullRemaining=Player.PullRemaining;p.moveRemaining=Player.MoveRemaining;p.damageRemaining=Player.DamageRemaining;
+            p.relayRemaining=relayRemaining;
         }
         public void Checkpoint(){if(store!=null&&Player!=null)Transact(p=>true);}
         public void Die()
@@ -183,6 +206,16 @@ namespace ParasiteEvolution
             if(Transact(p=>Economy.Upgrade(p,kind)))
             {Player.Health+=Balance.MaxHealth(Profile)-oldMax;Note("Покращення придбано.");}
             else if(FatalError==null)Note("Недостатньо геному або потрібен вищий рівень.");
+        }
+        public void BuyRelay()
+        {
+            if(!ShopOpen||!InSafe)return;
+            if(Transact(Economy.BuyRelay))
+            {
+                relayRemaining=Mathf.Min(relayRemaining,Balance.RelayInterval(Profile));
+                Note("Органічне реле посилено.");
+            }
+            else if(FatalError==null)Note("Реле: потрібен рівень 2, геном або досягнуто максимум.");
         }
         public void Unlock(string id)
         {
