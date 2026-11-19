@@ -113,6 +113,74 @@ internal static class Program
             Equal(0, p.cargoUnits, "cargo not added");
             Equal(0, p.totalCaptures, "capture counter");
         });
+        Run("carry predicate rejects zero and too large samples", () =>
+        {
+            var p = ProfileData.Fresh();
+            Check(!Balance.CanCarry(p, 0), "zero sized cargo");
+            Check(!Balance.CanCarry(p, 7), "oversized cargo");
+            Check(Balance.CanCarry(p, 6), "fitting cargo");
+            Check(Economy.Capture(p, 5, 15, 5, false), "capture five");
+            Check(!Balance.CanCarry(p, 2), "residual capacity insufficient");
+            Check(Balance.CanCarry(p, 1), "one unit still fits");
+        });
+        Run("relay purchase requires level and is bounded", () =>
+        {
+            var p = ProfileData.Fresh();
+            p.bank = 300;
+            Check(!Economy.BuyRelay(p), "must reach level two");
+            p.biomass = 30;
+            Check(Economy.BuyRelay(p), "purchase first relay");
+            Equal(1, p.relayLevel, "relay level one");
+            Equal(240, p.bank, "charged first price");
+            Equal(30f, Balance.RelayInterval(p), "first timer");
+            Check(Economy.BuyRelay(p), "purchase second relay");
+            Equal(2, p.relayLevel, "relay level two");
+            Equal(90, p.bank, "charged second price");
+            Equal(18f, Balance.RelayInterval(p), "second timer");
+            Check(!Economy.BuyRelay(p), "maxed relay rejected");
+            Equal(90, p.bank, "no third charge");
+            p.Validate();
+        });
+        Run("relay transfers held resources but does not advance base quest", () =>
+        {
+            var p = ProfileData.Fresh();
+            Check(Economy.Capture(p, 3, 17, 9, false), "capture");
+            Check(!Economy.RelayTransfer(p), "unlocked relay required");
+            p.bank = 60;
+            p.biomass = 30;
+            Check(Economy.BuyRelay(p), "buy relay");
+            Check(Economy.RelayTransfer(p), "transfer");
+            Equal(17, p.bank, "bank credited");
+            Equal(0, p.cargoUnits, "cargo emptied");
+            Equal(0, p.cargoValue, "cargo value emptied");
+            Equal(0, p.totalDeposits, "base deposit counter unaffected");
+            Equal(1, p.remoteTransfers, "remote transfer counted");
+            Check(!Economy.RelayTransfer(p), "cannot transfer twice");
+            p.Validate();
+        });
+        Run("relay overflow preserves cargo", () =>
+        {
+            var p = ProfileData.Fresh();
+            p.bank = Balance.ResourceLimit - 1;
+            p.relayLevel = 1;
+            Check(Economy.Capture(p, 1, 3, 3, false), "capture");
+            Check(!Economy.RelayTransfer(p), "bank would overflow");
+            Equal(1, p.cargoUnits, "cargo preserved");
+            Equal(Balance.ResourceLimit - 1, p.bank, "bank preserved");
+            Equal(0, p.remoteTransfers, "remote count unchanged");
+        });
+        Run("relay fields validate and older zero values remain valid", () =>
+        {
+            var p = ProfileData.Fresh();
+            p.Validate();
+            p.relayLevel = 3;
+            Throws<InvalidOperationException>(() => p.Validate(), "invalid relay tier");
+            p.relayLevel = 1;
+            p.relayRemaining = float.NaN;
+            Throws<InvalidOperationException>(() => p.Validate(), "invalid relay cooldown");
+            p.relayRemaining = 31f;
+            p.Validate();
+        });
         Run("invalid saves are rejected", () =>
         {
             var p = ProfileData.Fresh();
