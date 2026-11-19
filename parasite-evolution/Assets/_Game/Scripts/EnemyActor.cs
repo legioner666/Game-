@@ -96,7 +96,7 @@ namespace ParasiteEvolution
                 if (!WorldBuilder.ClearLine(transform.position, player)) { pullUntil = 0; return; }
                 CancelAttack();
                 var away = Flat(transform.position - player).normalized;
-                var target = player + away * 1.5f;
+                var target = player + away * 1.9f;
                 Move(Vector3.ClampMagnitude(Flat(target - transform.position), 12 * dt));
                 return;
             }

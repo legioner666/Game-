@@ -6,8 +6,9 @@ namespace ParasiteEvolution
     // Authoritative movement stays on CharacterController; the slime visuals only present it.
     public sealed class SlimeActor : MonoBehaviour
     {
-        public const float Radius = .62f;
-        public const float Height = 1.24f;
+        // Matches the visual mass (SlimeVisual.BodyScale) so the body does not sink into walls.
+        public const float Radius = .78f;
+        public const float Height = 1.56f;
         public GameSession Session;
         public SlimeVisual Visual { get; private set; }
         public float Health;

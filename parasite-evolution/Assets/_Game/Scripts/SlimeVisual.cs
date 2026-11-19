@@ -35,8 +35,10 @@ namespace ParasiteEvolution
         // angle, length, radius, gait group. Uneven on purpose: four limbs on the left, three on the
         // right, the longest pair in front; every limb is longer than the torso is wide.
         static readonly float[,] SupportLayout = {
-            { -34f, 2.65f, .17f, 0 }, { 28f, 2.95f, .19f, 1 }, { -82f, 2.2f, .15f, 1 }, { 76f, 2.45f, .16f, 0 },
-            { -124f, 2.0f, .14f, 0 }, { 118f, 2.3f, .15f, 1 }, { -158f, 1.75f, .12f, 1 } };
+            { -34f, 3.2f, .2f, 0 }, { 28f, 3.55f, .22f, 1 }, { -82f, 2.65f, .17f, 1 }, { 76f, 2.95f, .19f, 0 },
+            { -124f, 2.4f, .16f, 0 }, { 118f, 2.75f, .17f, 1 }, { -158f, 2.1f, .14f, 1 } };
+        // Overall size of the mass (about 2.2 m wide, 1.6 m at the hump); the collider in SlimeActor matches it.
+        const float BodyScale = 1.3f;
 
         readonly List<Limb> supports = new List<Limb>();
         readonly List<Limb> working = new List<Limb>();
@@ -78,7 +80,7 @@ namespace ParasiteEvolution
                 groups[i] = (int)SupportLayout[i, 3];
                 var a = limb.angle * Mathf.Deg2Rad;
                 // Roots sit on the flank of the mass, slightly irregular.
-                limb.rootLocal = new Vector3(Mathf.Sin(a) * .62f, .34f + .06f * Mathf.Cos(a * 3), Mathf.Cos(a) * .5f);
+                limb.rootLocal = new Vector3(Mathf.Sin(a) * .8f, .44f + .08f * Mathf.Cos(a * 3), Mathf.Cos(a) * .65f);
                 supports.Add(limb);
             }
             gait = new GaitPlanner(groups);
@@ -92,9 +94,9 @@ namespace ParasiteEvolution
             {
                 var limb = CreateLimb("Grasping tendril " + i);
                 limb.cycle = new LimbCycle { ExtendSpeed = 10f, RetractSpeed = 7f, PullSpeed = 5f };
-                limb.radius = .12f - i * .015f;
+                limb.radius = .14f - i * .018f;
                 limb.length = 9f;
-                limb.rootLocal = new Vector3((i - 1) * .24f, .62f - Mathf.Abs(i - 1) * .08f, .28f);
+                limb.rootLocal = new Vector3((i - 1) * .3f, .8f - Mathf.Abs(i - 1) * .1f, .36f);
                 working.Add(limb);
             }
             previous = transform.position;
@@ -122,13 +124,14 @@ namespace ParasiteEvolution
         void BuildNuclei()
         {
             // Directions on the upper surface; nuclei sit half-embedded so they read as organs under the skin.
-            var spots = new[] { new Vector3(-.3f, .9f, .25f), new Vector3(.25f, .75f, .55f), new Vector3(-.55f, .7f, -.3f) };
-            var sizes = new[] { .17f, .11f, .08f };
+            var spots = new[] { new Vector3(-.3f, .9f, .25f), new Vector3(.25f, .75f, .55f), new Vector3(-.55f, .7f, -.3f),
+                new Vector3(.5f, .6f, -.1f), new Vector3(-.05f, .8f, -.6f) };
+            var sizes = new[] { .26f, .17f, .13f, .1f, .08f };
             nuclei = new Transform[spots.Length];
             nucleiBase = new Vector3[spots.Length];
             for (var i = 0; i < spots.Length; i++)
             {
-                var surface = bodyTransform.localPosition + Surface(spots[i].normalized) * .97f;
+                var surface = bodyTransform.localPosition + Surface(spots[i].normalized) * .96f;
                 var node = Visuals.Shape(PrimitiveType.Sphere, transform, surface, Vector3.one * sizes[i], glow);
                 node.name = "Nucleus";
                 nuclei[i] = node.transform;
@@ -153,7 +156,7 @@ namespace ParasiteEvolution
                 var spread = 1 + (-.17f - p.y) * .9f;
                 p = new Vector3(p.x * spread, -.17f - (-.17f - p.y) * .25f, p.z * spread);
             }
-            return p;
+            return p * BodyScale;
         }
 
         static float Bump(Vector3 d, Vector3 axis, float width)
