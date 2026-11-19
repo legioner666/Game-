@@ -1,0 +1,34 @@
+name: Parasite Evolution (Unity-free checks)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["gpt/**", "claude/**"]
+    paths:
+      - "parasite-evolution/**"
+      - ".github/workflows/parasite-static.yml"
+  pull_request:
+    paths:
+      - "parasite-evolution/**"
+      - ".github/workflows/parasite-static.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  static-and-economy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Validate Unity project source structure
+        run: python3 parasite-evolution/Tools/check_source.py
+      - name: Validate setup script syntax
+        run: bash -n parasite-evolution/Tools/setup_remote.sh
+      - name: Run economy logic without Unity Editor
+        run: dotnet run --project parasite-evolution/Tools/StandaloneEconomyTests/StandaloneEconomyTests.csproj --configuration Release
