@@ -1,0 +1,47 @@
+name: Parasite Evolution (gameplay core + stub compile)
+
+# Unity-free checks for Parasite Evolution. Complements parasite-static.yml (economy harness, PR #23)
+# without duplicating it: this runs the NUnit EditMode tests that need no UnityEngine, and compiles
+# every runtime script against hand-written Unity API stubs. Neither step is a Unity compile.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/**", "gpt/**"]
+    paths:
+      - "parasite-evolution/**"
+      - ".github/workflows/parasite-gameplay-checks.yml"
+  pull_request:
+    paths:
+      - "parasite-evolution/**"
+      - ".github/workflows/parasite-gameplay-checks.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  gameplay-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Validate Unity project text, JSON and .meta GUIDs
+        run: python3 parasite-evolution/Tools/check_source.py
+      - name: Run Unity-free NUnit EditMode tests (gameplay core, mutations, economy)
+        run: >
+          dotnet test parasite-evolution/Tools/GameplayCoreTests/GameplayCoreTests.csproj
+          --configuration Release --logger "console;verbosity=normal"
+      - name: Compile all runtime scripts against Unity API stubs
+        run: dotnet build parasite-evolution/Tools/UnityApiStubCheck/UnityApiStubCheck.csproj --configuration Release
+      - name: Record scope
+        run: |
+          {
+            echo "### Parasite Evolution — Unity-free checks"
+            echo "- NUnit tests ran on plain .NET against the real game sources (no UnityEngine types)."
+            echo "- Runtime scripts compiled against hand-written stubs, not real Unity assemblies."
+            echo "- Not run here: Unity import, Unity Test Runner, rendering, Android build."
+          } >> "$GITHUB_STEP_SUMMARY"

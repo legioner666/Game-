@@ -8,3 +8,6 @@
 *.csproj
 *.sln
 *.user
+/Tools/**/bin/
+/Tools/**/obj/
+/Tools/**/TestResults/

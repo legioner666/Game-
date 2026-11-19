@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compiles every runtime game script against hand-written Unity API stubs (Stubs/).
+       Catches C# syntax/type errors without Unity. It is NOT a Unity compile: stub signatures may
+       differ from real Unity 6000.3 assemblies, and nothing is executed. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <OutputType>Library</OutputType>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>9.0</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>ParasiteEvolution.StubCheck</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Stubs/*.cs" />
+    <Compile Include="../../Assets/_Game/Scripts/**/*.cs" LinkBase="Game" />
+  </ItemGroup>
+</Project>

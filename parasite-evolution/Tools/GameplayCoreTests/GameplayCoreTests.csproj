@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Runs the Unity-free EditMode tests (NUnit) against the real game sources with plain .NET.
+       Only files without UnityEngine dependencies are compiled here. This is not a Unity compile. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>9.0</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/_Game/Scripts/ProfileData.cs" Link="Game/ProfileData.cs" />
+    <Compile Include="../../Assets/_Game/Scripts/Core/*.cs" LinkBase="Game/Core" />
+    <Compile Include="../../Assets/Tests/Editor/EconomyTests.cs" Link="Tests/EconomyTests.cs" />
+    <Compile Include="../../Assets/Tests/Editor/LimbAndGaitTests.cs" Link="Tests/LimbAndGaitTests.cs" />
+    <Compile Include="../../Assets/Tests/Editor/DashAndWardenTests.cs" Link="Tests/DashAndWardenTests.cs" />
+    <Compile Include="../../Assets/Tests/Editor/MutationTests.cs" Link="Tests/MutationTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+  </ItemGroup>
+</Project>
