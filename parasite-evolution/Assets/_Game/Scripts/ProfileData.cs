@@ -4,6 +4,9 @@ using System.Collections.Generic;
 namespace ParasiteEvolution
 {
     public enum UpgradeKind { CaptureSpeed, Capacity, Speed, Radius, Channels, Health }
+    // Permanent body changes bought with genome after reaching a level. Stored as a bit mask in an
+    // additive schema-1 field: older saves simply load with no mutations.
+    public enum MutationKind { ChitinSpikes, AcidGlands, LongLimbs, DenseMembrane, PredatorReflex, ElasticStomach }
 
     [Serializable]
     public sealed class ProfileData
@@ -22,6 +25,7 @@ namespace ParasiteEvolution
         public int visitedZones;
         public int wardenKills;
         public int deathSerial;
+        public int mutationMask;
         public int[] upgrades;
         public List<string> abilities;
         public float health;
@@ -49,7 +53,8 @@ namespace ParasiteEvolution
                 totalCaptures < 0 || totalDeposits < 0 || upgradesBought < 0 ||
                 questStage < 0 || questStage > Balance.QuestRewards.Length ||
                 deathSerial < 0 || wardenKills < 0 || visitedZones < 0 || visitedZones > 7 ||
-                upgrades == null || upgrades.Length != 6 || abilities == null)
+                upgrades == null || upgrades.Length != 6 || abilities == null ||
+                (mutationMask & ~Balance.MutationMaskAll) != 0)
                 throw new InvalidOperationException("Invalid profile data.");
             foreach (var n in upgrades)
                 if (n < 0 || n > Balance.MaxUpgrade) throw new InvalidOperationException("Invalid upgrade.");
@@ -74,16 +79,39 @@ namespace ParasiteEvolution
         public const float PullCooldown = 4;
         public const float MoveCooldown = 7;
         public const float DamageCooldown = 13;
-        public static readonly int[] QuestRewards = { 12, 18, 25, 35, 60 };
-        public static readonly int[] QuestGoals = { 4, 2, 1, 3, 1 };
+        public static readonly int[] QuestRewards = { 12, 18, 25, 35, 60, 80, 120 };
+        public static readonly int[] QuestGoals = { 4, 2, 1, 3, 1, 1, 10 };
+        public const int MutationCount = 6;
+        public const int MutationMaskAll = (1 << MutationCount) - 1;
+        public static readonly int[] MutationLevels = { 3, 3, 4, 5, 6, 7 };
+        public static readonly int[] MutationPrices = { 60, 75, 110, 140, 190, 240 };
+        public static bool Has(ProfileData p, MutationKind kind) => (p.mutationMask & (1 << (int)kind)) != 0;
+        public static int Mutations(ProfileData p)
+        {
+            var n = 0;
+            for (var i = 0; i < MutationCount; i++) if ((p.mutationMask & (1 << i)) != 0) n++;
+            return n;
+        }
         public static bool IsAbility(string id) => id == "AB-PULL" || id == "AB-MOVE" || id == "AB-DAMAGE";
-        public static int Capacity(ProfileData p) => 6 + p.upgrades[(int)UpgradeKind.Capacity] * 2;
+        public static int Capacity(ProfileData p) => 6 + p.upgrades[(int)UpgradeKind.Capacity] * 2 +
+            (Has(p, MutationKind.ElasticStomach) ? 4 : 0);
         public static float MaxHealth(ProfileData p) => 50 + 10 * p.upgrades[(int)UpgradeKind.Health];
         public static float Speed(ProfileData p) => 4.5f + .25f * p.upgrades[(int)UpgradeKind.Speed];
-        public static float Radius(ProfileData p) => 3.2f + .18f * p.upgrades[(int)UpgradeKind.Radius];
+        public static float Radius(ProfileData p) => 3.2f + .18f * p.upgrades[(int)UpgradeKind.Radius] +
+            (Has(p, MutationKind.LongLimbs) ? .8f : 0);
         public static int Channels(ProfileData p) => Math.Min(3, 1 + p.upgrades[(int)UpgradeKind.Channels]);
         public static int UpgradeLimit(UpgradeKind kind) => kind == UpgradeKind.Channels ? 2 : MaxUpgrade;
-        public static float CaptureDamage(ProfileData p) => 12 + 3 * p.upgrades[(int)UpgradeKind.CaptureSpeed];
+        public static float CaptureDamage(ProfileData p) => (12 + 3 * p.upgrades[(int)UpgradeKind.CaptureSpeed]) *
+            (Has(p, MutationKind.AcidGlands) ? 1.25f : 1);
+        public static float StrikeDamage(ProfileData p) => 38 * (Has(p, MutationKind.ChitinSpikes) ? 1.5f : 1);
+        public static float DamageTaken(ProfileData p, float damage) =>
+            Math.Max(0, damage) * (Has(p, MutationKind.DenseMembrane) ? .75f : 1);
+        public static float DashDistance(ProfileData p) => Has(p, MutationKind.LongLimbs) ? 11.5f : 9;
+        public static float Cooldown(ProfileData p, string id)
+        {
+            var scale = Has(p, MutationKind.PredatorReflex) ? .8f : 1;
+            return (id == "AB-PULL" ? PullCooldown : id == "AB-MOVE" ? MoveCooldown : DamageCooldown) * scale;
+        }
         public static int AbilityPrice(string id) => id == "AB-MOVE" ? 35 : id == "AB-DAMAGE" ? 80 : -1;
         public static int UpgradePrice(ProfileData p, UpgradeKind kind)
             => (int)Math.Min(ResourceLimit, Math.Ceiling((kind == UpgradeKind.Channels ? 30 : 8) *
@@ -109,6 +137,8 @@ namespace ParasiteEvolution
                 case 3: return ((p.visitedZones & 1) != 0 ? 1 : 0) +
                                ((p.visitedZones & 2) != 0 ? 1 : 0) + ((p.visitedZones & 4) != 0 ? 1 : 0);
                 case 4: return p.wardenKills;
+                case 5: return Mutations(p);
+                case 6: return p.totalDeposits;
                 default: return 0;
             }
         }
@@ -147,6 +177,15 @@ namespace ParasiteEvolution
             var cost = Balance.UpgradePrice(p, kind);
             if (p.bank < cost) return false;
             p.bank -= cost; p.upgrades[index]++; p.upgradesBought++; return true;
+        }
+        public static bool Mutate(ProfileData p, MutationKind kind)
+        {
+            var index = (int)kind;
+            if (index < 0 || index >= Balance.MutationCount || Balance.Has(p, kind) ||
+                Balance.Level(p) < Balance.MutationLevels[index]) return false;
+            var cost = Balance.MutationPrices[index];
+            if (p.bank < cost) return false;
+            p.bank -= cost; p.mutationMask |= 1 << index; return true;
         }
         public static bool ClaimQuest(ProfileData p)
         {

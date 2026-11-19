@@ -44,6 +44,18 @@ namespace ParasiteEvolution.Editor
                 if(shader==null)throw new InvalidOperationException("URP shader not imported.");
                 AssetDatabase.CreateAsset(new Material(shader),materialPath);
             }
+            // Emissive template: a material with _EMISSION enabled must exist in the build, or the
+            // keyword variant is stripped and runtime glow materials render without emission.
+            const string glowPath="Assets/_Game/Resources/PrototypeGlow.mat";
+            if(AssetDatabase.LoadAssetAtPath<Material>(glowPath)==null)
+            {
+                var shader=Shader.Find("Universal Render Pipeline/Simple Lit");
+                if(shader==null)throw new InvalidOperationException("URP shader not imported.");
+                var glow=new Material(shader);glow.EnableKeyword("_EMISSION");
+                glow.globalIlluminationFlags=MaterialGlobalIlluminationFlags.None;
+                if(glow.HasProperty("_EmissionColor"))glow.SetColor("_EmissionColor",Color.white);
+                AssetDatabase.CreateAsset(glow,glowPath);
+            }
             AssetDatabase.SaveAssets();
         }
 
@@ -63,6 +75,32 @@ namespace ParasiteEvolution.Editor
         [MenuItem("Parasite/Build Android debug APK")]
         public static void BuildAndroid()
         {
+            Build(Path.GetFullPath(Path.Combine(Application.dataPath,"../Builds/ParasiteEvolution-debug.apk")));
+        }
+
+        // Entry point for GameCI (game-ci/unity-builder buildMethod). Honours -customBuildPath.
+        public static void BuildAndroidCI()
+        {
+            var path=Argument("-customBuildPath");
+            if(string.IsNullOrEmpty(path))path=Path.Combine(Application.dataPath,"../Builds/ParasiteEvolution-debug.apk");
+            if(!path.EndsWith(".apk",StringComparison.OrdinalIgnoreCase))path=Path.Combine(path,"ParasiteEvolution-debug.apk");
+            try{Build(Path.GetFullPath(path));}
+            catch(Exception ex){Debug.LogException(ex);EditorApplication.Exit(1);}
+        }
+
+        // Pre-export method for Unity Build Automation: generates the scene and Android settings, then
+        // UBA builds the scenes listed in EditorBuildSettings with its own signing configuration.
+        public static void PrepareCloudBuild(){ConfigureAndroid();}
+
+        static string Argument(string name)
+        {
+            var args=Environment.GetCommandLineArgs();
+            for(var i=0;i<args.Length-1;i++)if(args[i]==name)return args[i+1];
+            return null;
+        }
+
+        static void ConfigureAndroid()
+        {
             CreateBootstrap();
             PlayerSettings.companyName="ParasitePrototype";PlayerSettings.productName="Parasite Evolution";
             PlayerSettings.bundleVersion="0.1.0";
@@ -76,9 +114,14 @@ namespace ParasiteEvolution.Editor
             PlayerSettings.Android.targetSdkVersion=AndroidSdkVersions.AndroidApiLevelAuto;
             PlayerSettings.Android.bundleVersionCode=1;
             EditorUserBuildSettings.buildAppBundle=false;
+            AssetDatabase.SaveAssets();
+        }
+
+        static void Build(string path)
+        {
+            ConfigureAndroid();
             if(EditorUserBuildSettings.activeBuildTarget!=BuildTarget.Android)
                 throw new InvalidOperationException("Select Android in Build Profiles, or launch batch mode with -buildTarget Android.");
-            var path=Path.GetFullPath(Path.Combine(Application.dataPath,"../Builds/ParasiteEvolution-debug.apk"));
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             var report=BuildPipeline.BuildPlayer(new BuildPlayerOptions {
                 scenes=new[]{Scene},locationPathName=path,target=BuildTarget.Android,

@@ -15,6 +15,21 @@ namespace ParasiteEvolution
             if (result.HasProperty("_BaseColor")) result.SetColor("_BaseColor", color);
             return result;
         }
+        // Emissive variant. The template is created by the editor with _EMISSION enabled, so the
+        // keyword variant is kept in player builds instead of being stripped.
+        public static Material Glow(Color color, float intensity)
+        {
+            var template = Resources.Load<Material>("PrototypeGlow");
+            var result = template != null ? new Material(template) : Material(color);
+            result.color = color;
+            if (result.HasProperty("_BaseColor")) result.SetColor("_BaseColor", color);
+            if (result.HasProperty("_EmissionColor"))
+            {
+                result.EnableKeyword("_EMISSION");
+                result.SetColor("_EmissionColor", color * intensity);
+            }
+            return result;
+        }
         public static GameObject Shape(PrimitiveType type, Transform parent, Vector3 pos,
             Vector3 scale, Material material, bool solid = false)
         {
@@ -72,23 +87,36 @@ namespace ParasiteEvolution
                 new Vector3(1.6f,.6f,1.6f), wall);
             Visuals.Shape(PrimitiveType.Sphere, Root, SafePoint + new Vector3(-1.8f,1.3f,-1.2f),
                 Vector3.one*.8f, safe);
+            // Cover and pillars: break sight lines, give the Warden's charge something to crash into.
+            var crate = Visuals.Material(new Color(.22f,.27f,.31f));
+            foreach (var block in Obstacles)
+                Visuals.Shape(PrimitiveType.Cube, Root, new Vector3(block.x, block.w*.5f, block.y),
+                    new Vector3(block.z, block.w, block.z), crate, true);
             for (var zone = 0; zone < 3; zone++)
                 for (var n = 0; n < 7; n++)
                 {
                     var x = -24 + zone*23 + (n%3)*3;
                     var z = zone == 0 ? 4 + (n/3)*4 : -13 + (n/3)*10;
-                    var enemy = new GameObject("Guard-"+zone+"-"+n).AddComponent<EnemyActor>();
-                    enemy.Initialize(session, new Vector3(x,0,z), zone, false);
+                    var kind = zone == 0 ? EnemyKind.Drone : zone == 2 && n % 3 == 1 ? EnemyKind.Zapper : EnemyKind.Guard;
+                    var enemy = new GameObject(kind+"-"+zone+"-"+n).AddComponent<EnemyActor>();
+                    enemy.Initialize(session, new Vector3(x,0,z), zone, kind);
                 }
             var boss = new GameObject("Warden").AddComponent<EnemyActor>();
-            boss.Initialize(session, new Vector3(27,0,15), 2, true);
+            boss.Initialize(session, new Vector3(27,0,15), 2, EnemyKind.Warden);
             var sun = new GameObject("Light").AddComponent<Light>();
             sun.type = LightType.Directional; sun.intensity = 1.35f;
             sun.transform.rotation = Quaternion.Euler(55,-35,0); sun.shadows = LightShadows.Soft;
             RenderSettings.ambientLight = new Color(.48f,.55f,.66f);
             RenderSettings.fog = true; RenderSettings.fogColor = new Color(.17f,.22f,.28f);
             RenderSettings.fogMode = FogMode.Linear; RenderSettings.fogStartDistance = 35; RenderSettings.fogEndDistance = 80;
+            Physics.SyncTransforms();
         }
+        // x, z, footprint, height. Kept clear of the base, spawn points and partition openings.
+        public static readonly Vector4[] Obstacles = {
+            new Vector4(-30,14,2,1.6f), new Vector4(-15.5f,-17,2.4f,1.2f), new Vector4(-31,-19,1.6f,2),
+            new Vector4(-6,0,2.2f,1.4f), new Vector4(8,13,2,2), new Vector4(-5,16,1.6f,1.2f), new Vector4(7.5f,-8,1.8f,1.6f),
+            new Vector4(16,4,2,1.8f), new Vector4(31,-6,2.2f,1.4f), new Vector4(18,-18,1.8f,2), new Vector4(21.5f,18,1.6f,2.2f),
+            new Vector4(32.5f,12,1.6f,2) };
         public static int ZoneAt(Vector3 p) => p.x < -11.5f ? 0 : p.x < 11.5f ? 1 : 2;
         public static bool IsSafe(Vector3 p) => Vector3.Distance(new Vector3(p.x,0,p.z),SafePoint) <= SafeRadius;
         public static bool ClearLine(Vector3 a, Vector3 b)
