@@ -22,6 +22,10 @@ namespace ParasiteEvolution
         public int visitedZones;
         public int wardenKills;
         public int deathSerial;
+        // Optional v1 fields: older JSON saves default these to zero.
+        public int relayLevel;
+        public int remoteTransfers;
+        public float relayRemaining;
         public int[] upgrades;
         public List<string> abilities;
         public float health;
@@ -49,6 +53,7 @@ namespace ParasiteEvolution
                 totalCaptures < 0 || totalDeposits < 0 || upgradesBought < 0 ||
                 questStage < 0 || questStage > Balance.QuestRewards.Length ||
                 deathSerial < 0 || wardenKills < 0 || visitedZones < 0 || visitedZones > 7 ||
+                relayLevel < 0 || relayLevel > 2 || remoteTransfers < 0 ||
                 upgrades == null || upgrades.Length != 6 || abilities == null)
                 throw new InvalidOperationException("Invalid profile data.");
             foreach (var n in upgrades)
@@ -56,10 +61,11 @@ namespace ParasiteEvolution
             var seen = new HashSet<string>();
             foreach (var id in abilities)
                 if (!Balance.IsAbility(id) || !seen.Add(id)) throw new InvalidOperationException("Invalid ability.");
-            foreach (var v in new[] { health, x, z, pullRemaining, moveRemaining, damageRemaining })
+            foreach (var v in new[] { health, x, z, pullRemaining, moveRemaining, damageRemaining, relayRemaining })
                 if (float.IsNaN(v) || float.IsInfinity(v)) throw new InvalidOperationException("Invalid number.");
             if (health < 0 || health > Balance.MaxHealth(this) || cargoUnits > Balance.Capacity(this) ||
                 pullRemaining < 0 || moveRemaining < 0 || damageRemaining < 0 ||
+                relayRemaining < 0 || relayRemaining > 120 ||
                 Math.Abs(x) > 1000 || Math.Abs(z) > 1000)
                 throw new InvalidOperationException("Invalid runtime snapshot.");
         }
@@ -84,6 +90,11 @@ namespace ParasiteEvolution
         public static int Channels(ProfileData p) => Math.Min(3, 1 + p.upgrades[(int)UpgradeKind.Channels]);
         public static int UpgradeLimit(UpgradeKind kind) => kind == UpgradeKind.Channels ? 2 : MaxUpgrade;
         public static float CaptureDamage(ProfileData p) => 12 + 3 * p.upgrades[(int)UpgradeKind.CaptureSpeed];
+        public static bool CanCarry(ProfileData p, int units)
+            => units > 0 && units <= Capacity(p) - p.cargoUnits;
+        // Provisional free-to-play tuning. Relay transports carried samples, never generates money.
+        public static int RelayPrice(ProfileData p) => p.relayLevel == 0 ? 60 : p.relayLevel == 1 ? 150 : -1;
+        public static float RelayInterval(ProfileData p) => p.relayLevel == 1 ? 30f : p.relayLevel == 2 ? 18f : 0f;
         public static int AbilityPrice(string id) => id == "AB-MOVE" ? 35 : id == "AB-DAMAGE" ? 80 : -1;
         public static int UpgradePrice(ProfileData p, UpgradeKind kind)
             => (int)Math.Min(ResourceLimit, Math.Ceiling((kind == UpgradeKind.Channels ? 30 : 8) *
@@ -118,7 +129,7 @@ namespace ParasiteEvolution
     {
         public static bool Capture(ProfileData p, int units, int value, int xp, bool warden)
         {
-            if (units <= 0 || value < 0 || xp < 0 || units > Balance.Capacity(p) - p.cargoUnits ||
+            if (!Balance.CanCarry(p, units) || value < 0 || xp < 0 ||
                 (long)p.cargoValue + value > Balance.ResourceLimit ||
                 (long)p.biomass + xp > Balance.ResourceLimit || p.totalCaptures == int.MaxValue ||
                 (warden && p.wardenKills == int.MaxValue)) return false;
@@ -131,6 +142,25 @@ namespace ParasiteEvolution
             if (p.cargoUnits <= 0 || (long)p.bank + p.cargoValue > Balance.ResourceLimit ||
                 p.totalDeposits == int.MaxValue) return false;
             p.bank += p.cargoValue; p.cargoUnits = 0; p.cargoValue = 0; p.totalDeposits++;
+            return true;
+        }
+        // Transfers collected samples; deliberately does NOT count toward the return-to-base quest.
+        public static bool RelayTransfer(ProfileData p)
+        {
+            if (p.relayLevel <= 0 || p.cargoUnits <= 0 || p.remoteTransfers == int.MaxValue ||
+                (long)p.bank + p.cargoValue > Balance.ResourceLimit) return false;
+            p.bank += p.cargoValue;
+            p.cargoUnits = 0;
+            p.cargoValue = 0;
+            p.remoteTransfers++;
+            return true;
+        }
+        public static bool BuyRelay(ProfileData p)
+        {
+            var cost = Balance.RelayPrice(p);
+            if (Balance.Level(p) < 2 || cost < 0 || p.bank < cost) return false;
+            p.bank -= cost;
+            p.relayLevel++;
             return true;
         }
         public static bool Unlock(ProfileData p, string id)
