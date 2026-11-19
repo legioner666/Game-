@@ -97,6 +97,8 @@ namespace ParasiteEvolution
                 for(var i=0;i<targets.Count&&i<channels;i++)
                 {
                     var enemy=targets[i];
+                    // Capacity can change during this tick when a previous capture completes.
+                    if(!Balance.CanCarry(Profile,enemy.Units))continue;
                     Player.Visual.WorkTargets.Add(enemy.transform.position+Vector3.up*.65f);
                     enemy.Damage(Balance.CaptureDamage(Profile)*dt);
                     if(Paused)break;
