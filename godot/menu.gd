@@ -5,6 +5,7 @@ signal play_pressed(level: int)
 signal stress_pressed
 
 const I18n = preload("res://i18n.gd")
+const MenuScene = preload("res://menu_scene.gd")
 const Settings = preload("res://settings.gd")
 const Progression = preload("res://progression.gd")
 
@@ -142,24 +143,27 @@ func _build() -> void:
 	_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_root)
 
-	var grad := Gradient.new()
-	grad.set_color(0, Color("#3a5d73"))
-	grad.set_color(1, Color("#142634"))
-	var gt := GradientTexture2D.new()
-	gt.gradient = grad
-	gt.fill_from = Vector2(0.5, 0.0)
-	gt.fill_to = Vector2(0.5, 1.0)
-	gt.width = 8
-	gt.height = 256
-	var bg := TextureRect.new()
-	bg.texture = gt
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg.stretch_mode = TextureRect.STRETCH_SCALE
-	_root.add_child(bg)
-
-	var scene := CastleScene.new()
-	scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_root.add_child(scene)
+	_root.add_child(MenuScene.new())
+	# затемнення: на головній — м'яке знизу, на інших сторінках — рівне для читабельності
+	var shade := TextureRect.new()
+	var sg := Gradient.new()
+	var main_page := _page == "main"
+	sg.set_color(0, Color(0.04, 0.08, 0.16, 0.45 if main_page else 0.82))
+	sg.set_color(1, Color(0.04, 0.08, 0.16, 0.0 if main_page else 0.82))
+	if main_page:
+		sg.add_point(0.55, Color(0.04, 0.08, 0.16, 0.0))
+		sg.set_color(2, Color(0.04, 0.08, 0.16, 0.80))
+	var sgt := GradientTexture2D.new()
+	sgt.gradient = sg
+	sgt.fill_from = Vector2(0.5, 0.0)
+	sgt.fill_to = Vector2(0.5, 1.0)
+	sgt.width = 8
+	sgt.height = 256
+	shade.texture = sgt
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.stretch_mode = TextureRect.STRETCH_SCALE
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(shade)
 
 	var box := VBoxContainer.new()
 	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -182,24 +186,29 @@ func _build() -> void:
 
 
 func _build_main(box: VBoxContainer) -> void:
-	var crown_row := HBoxContainer.new()
-	crown_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	crown_row.add_child(CrownIcon.new())
-	box.add_child(crown_row)
-	box.add_child(_label(I18n.t("title"), 130, Color("#F8D874")))
-	box.add_child(_label(I18n.t("tagline"), 50, Color("#F2E6CB")))
+	box.offset_top = 120
+	box.offset_bottom = -150
+	var logo := _label(I18n.t("title"), 124, Color("#FFD95A"))
+	logo.add_theme_constant_override("outline_size", 24)
+	box.add_child(logo)
+	box.add_child(_label(I18n.t("tagline"), 46, Color("#FFF4D6")))
 	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 120)
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(spacer)
-	var play := _button(I18n.t("play"), Color("#E8B547"), 190, 82)
+	var play := _button(I18n.t("play"), Color("#F2B63A"), 200, 88)
 	play.pressed.connect(func(): _go("levels"))
 	box.add_child(play)
-	var workshop := _button(I18n.t("workshop"), Color("#355c62"), 150, 58)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 26)
+	box.add_child(row)
+	var workshop := _button(I18n.t("workshop"), Color("#2f7f8c"), 150, 46)
+	workshop.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	workshop.pressed.connect(func(): _go("workshop"))
-	box.add_child(workshop)
-	var st := _button(I18n.t("settings"), Color("#2f4b5f"), 150, 58)
+	row.add_child(workshop)
+	var st := _button(I18n.t("settings"), Color("#4a5f9c"), 150, 46)
+	st.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	st.pressed.connect(func(): _go("settings"))
-	box.add_child(st)
+	row.add_child(st)
 
 
 func _build_levels(box: VBoxContainer) -> void:
@@ -207,10 +216,31 @@ func _build_levels(box: VBoxContainer) -> void:
 	var sp := Control.new()
 	sp.custom_minimum_size = Vector2(0, 40)
 	box.add_child(sp)
+	# Вибір складності: наступна відкривається після проходження всіх рівнів попередньої
+	var drow := HBoxContainer.new()
+	drow.add_theme_constant_override("separation", 14)
+	box.add_child(drow)
+	var dcol := [Color("#4f8a5a"), Color("#b7742c"), Color("#9c3b3b")]
+	for d in Settings.DIFF_COUNT:
+		var dopen := Settings.diff_unlocked(d)
+		var sel := d == Settings.difficulty
+		var db := _button(I18n.t("diff_%d" % d), dcol[d] if sel else Color("#33434f"), 120, 40)
+		db.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		db.disabled = not dopen
+		var dd := d
+		db.pressed.connect(func():
+			Settings.difficulty = dd
+			Settings.save_settings()
+			_go("levels"))
+		drow.add_child(db)
+	var diff: int = Settings.difficulty
+	if not Settings.diff_unlocked(mini(diff + 1, Settings.DIFF_COUNT - 1)):
+		box.add_child(_label(I18n.t("diff_unlock_hint"), 36))
+	box.add_child(_label(I18n.t("mastery_now") % Progression.mastery_percent(), 40, Color("#9fd8c4")))
 	for lv in Settings.LEVEL_COUNT:
-		var open := Settings.unlocked(lv)
+		var open := Settings.unlocked(lv, diff)
 		var row := Control.new()
-		row.custom_minimum_size = Vector2(0, 250)
+		row.custom_minimum_size = Vector2(0, 230)
 		box.add_child(row)
 		var b := _button((I18n.t("level") % (lv + 1)) + " · " + I18n.t(Levels.data(lv)["name"]), Color("#E8B547") if open else Color("#3a4650"), 190, 56)
 		b.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -221,8 +251,16 @@ func _build_levels(box: VBoxContainer) -> void:
 			_click()
 			play_pressed.emit(l))
 		row.add_child(b)
+		var need: int = Progression.RECOMMENDED[diff][lv]
+		if open and need > 0:
+			var rec := _label(I18n.t("mastery_need") % need, 34, Color("#8fe0a8") if Progression.mastery_percent() >= need else Color("#ff9a8a"))
+			rec.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+			rec.offset_top = -52
+			rec.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			rec.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			row.add_child(rec)
 		if open:
-			var st := StarRow.new(int(Settings.stars[lv]), 44.0)
+			var st := StarRow.new(Settings.stars_of(lv, diff), 44.0)
 			st.anchor_left = 0.5
 			st.anchor_right = 0.5
 			st.anchor_top = 1.0
@@ -241,24 +279,26 @@ func _build_levels(box: VBoxContainer) -> void:
 func _build_workshop(box: VBoxContainer) -> void:
 	box.add_child(_label(I18n.t("workshop"), 92, Color("#F8D874")))
 	box.add_child(_label(I18n.t("tech_points") % [Progression.available_points(), Progression.earned_points()], 52))
-	box.add_child(_label(I18n.t("tech_help"), 42))
+	box.add_child(_label(I18n.t("mastery_now") % Progression.mastery_percent(), 44, Color("#9fd8c4")))
+	box.add_child(_label(I18n.t("tech_help"), 38))
 	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 30)
+	spacer.custom_minimum_size = Vector2(0, 10)
 	box.add_child(spacer)
 	for kind in Progression.KINDS:
 		var current_rank: int = Progression.rank(kind)
 		var next_cost: int = Progression.next_price(kind)
 		var cost_label: String = I18n.t("tech_max") if next_cost == 0 else I18n.t("tech_cost") % next_cost
 		var label_text := "%s  %d/%d · %s" % [I18n.t(kind), current_rank, Progression.MAX_RANK, cost_label]
-		var button := _button(label_text, Color("#386f63") if Progression.can_buy(kind) else Color("#354956"), 140, 44)
+		var button := _button(label_text, Color("#386f63") if Progression.can_buy(kind) else Color("#354956"), 112, 40)
 		button.disabled = not Progression.can_buy(kind)
 		var upgrade_kind: String = kind
 		button.pressed.connect(func():
 			if Progression.buy(upgrade_kind):
 				_go("workshop"))
 		box.add_child(button)
-		var percent: int = 6 * current_rank if kind == "crossbow" else (5 * current_rank if kind == "cannon" else 8 * current_rank)
-		box.add_child(_label(I18n.t("tech_" + kind + "_desc") % percent, 39))
+		var amount: int = Progression.CASTLE_HP_STEP * current_rank if kind == "castle" else int(Progression.STEP_PERCENT[kind]) * current_rank
+		var top: int = Progression.CASTLE_HP_STEP * Progression.MAX_RANK if kind == "castle" else int(Progression.STEP_PERCENT[kind]) * Progression.MAX_RANK
+		box.add_child(_label((I18n.t("tech_" + kind + "_desc") % amount) + (I18n.t("tech_upto") % top), 36))
 	if Progression.spent_points() > 0:
 		var reset := _button(I18n.t("tech_reset"), Color("#6b4c3d"), 115, 46)
 		reset.pressed.connect(func():
@@ -290,13 +330,17 @@ func _build_settings(box: VBoxContainer) -> void:
 	box.add_child(lang)
 	_toggle_row(box, "shadows", Settings.shadows, func(v): Settings.shadows = v)
 	_toggle_row(box, "vibration", Settings.vibration, func(v): Settings.vibration = v)
+	_toggle_row(box, "music", Settings.music, func(v): Settings.music = v)
 	_toggle_row(box, "sound", Settings.sound, func(v): Settings.sound = v)
+	var tools := OS.is_debug_build()
 	var stress := _button(I18n.t("stress"), Color(0.25, 0.25, 0.3), 120, 46)
+	stress.visible = tools
 	stress.pressed.connect(func():
 		_click()
 		stress_pressed.emit())
 	box.add_child(stress)
 	var rep := _button(I18n.t("copy_report"), Color(0.2, 0.4, 0.55), 120, 46)
+	rep.visible = tools
 	rep.pressed.connect(func():
 		_click()
 		Report.copy_to_clipboard()

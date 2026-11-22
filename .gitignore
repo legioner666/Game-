@@ -1,0 +1,3 @@
+*.keystore
+!.github/debug.keystore
+*.jks

@@ -36,7 +36,7 @@ const HERO_SPEED := 7.4
 const HERO_ACCEL := 48.0
 const HERO_DECEL := 64.0
 const HERO_RANGE := 7.5
-const HERO_DMG := 9.0
+const HERO_DMG := 11.0
 const HERO_CD := 0.65
 const CARRY_CAP := 150
 const START_COINS := 15
@@ -61,19 +61,29 @@ const E_SCALE := [1.1, 1.0, 1.0]
 const E_CONTACT_DPS := [4.0, 3.0, 14.0]
 const E_OFFSET := [0.9, 0.9, 0.35]
 
+## Максимальний рівень споруди (L4 «Майстерність» — сінк для золота після повної прокачки).
+const MAX_LV := 4
 const KIND := {
-	"crossbow": {"cost": [15, 25, 40], "range": [8.5, 9.0, 9.5], "dmg": [12.0, 18.0, 28.0], "cd": [0.7, 0.6, 0.5]},
-	"cannon": {"cost": [40, 60, 90], "range": [8.5, 9.0, 9.5], "dmg": [40.0, 65.0, 100.0], "cd": [2.2, 2.0, 1.8], "aoe": [2.0, 2.3, 2.6]},
-	"barracks": {"cost": [30, 45, 65], "cap": [3, 4, 6], "dmg": [8.0, 11.0, 15.0], "hp": [40.0, 60.0, 90.0]},
+	"crossbow": {"cost": [15, 25, 40, 70], "range": [8.5, 9.0, 9.5, 10.0], "dmg": [12.0, 18.0, 28.0, 44.0], "cd": [0.7, 0.6, 0.5, 0.42]},
+	"cannon": {"cost": [40, 60, 90, 130], "range": [8.5, 9.0, 9.5, 10.0], "dmg": [40.0, 60.0, 82.0, 115.0], "cd": [2.2, 2.0, 1.8, 1.55], "aoe": [2.0, 2.3, 2.6, 3.0]},
+	"barracks": {"cost": [30, 45, 65, 90], "cap": [3, 4, 6, 8], "dmg": [11.0, 15.0, 21.0, 30.0], "hp": [55.0, 80.0, 115.0, 165.0]},
 }
 # Група: [тип, кількість, старт (с), інтервал (с)]
 const LEVEL_MULT := [1.2, 4.4, 8.0]
 const LEVEL_START_MULT := [1.0, 1.3, 1.35]
-const LEVEL_HP := [1.0, 1.4, 1.8]
+const LEVEL_HP := [1.0, 1.4, 1.45]
 const LEVEL_SPD := [1.0, 1.04, 1.06]
 const LEVEL_COIN := [1.0, 1.0, 1.1]
-const LEVEL_START := [15, 20, 30]
+const LEVEL_START := [15, 20, 40]
 const LEVEL_BRUTES := [1, 6, 12]
+## Складність: 0 — звичайна, 1 — важка, 2 — кошмар. Множники до рівня.
+## Міцність ворогів на останній хвилі: [складність][рівень] (рівні мають різну кількість плит).
+const DIFF_HP := [[1.0, 1.0, 1.0], [3.1, 5.5, 5.8], [6.0, 9.1, 7.7]]
+const DIFF_COUNT := [1.0, 1.15, 1.35]
+const DIFF_SPD := [1.0, 1.05, 1.1]
+const DIFF_COIN := [1.0, 0.95, 0.9]
+const DIFF_EXTRA_WAVES := [0, 1, 2]
+const DIFF_START_BONUS := [0, 20, 40]
 const WAVES := [
 	[[0, 7, 0.0, 1.2]],
 	[[0, 11, 0.0, 1.0], [1, 4, 4.0, 1.8]],
@@ -321,6 +331,9 @@ var _inter_t := 4.0
 var _wave_clock := 0.0
 var _spawn_queue: Array = []
 var _base_hp := BASE_HP_MAX
+var _base_max := BASE_HP_MAX
+var difficulty := 0
+var _bot_spell_t := 0.0
 
 var _time := 0.0
 var _play_time := 0.0
@@ -375,6 +388,7 @@ var _joy_draw: JoyDraw
 var _ui: CanvasLayer
 var _coin_label: Label
 var _wave_label: Label
+var _preview_label: Label
 var _sub_label: Label
 var _hp_bar: ProgressBar
 var _hint_label: Label
@@ -398,10 +412,13 @@ var _bot_log_t := 0.0
 
 func _ready() -> void:
 	randomize()
+	difficulty = clampi(Settings.difficulty, 0, DIFF_HP.size() - 1)
 	_parse_args()
+	_base_max = BASE_HP_MAX + Progression.castle_bonus()
+	_base_hp = _base_max
 	_load_level()
 	_waves = _make_waves(clampi(level, 0, LEVEL_MULT.size() - 1))
-	_carried = LEVEL_START[clampi(level, 0, LEVEL_START.size() - 1)]
+	_carried = LEVEL_START[clampi(level, 0, LEVEL_START.size() - 1)] + DIFF_START_BONUS[difficulty]
 	_build_path()
 	_build_world()
 	_build_batches()
@@ -423,7 +440,7 @@ func _ready() -> void:
 	_meteor_fx.impacted.connect(_on_meteor_impact)
 	_rebuild_obstacles()
 	_run_id = Report.begin_run()
-	Report.ev(0.0, "level", "n=%d" % (level + 1))
+	Report.ev(0.0, "level", "n=%d diff=%d mastery=%d%%" % [level + 1, difficulty, Progression.mastery_percent()])
 	if _show_kind == "perks":
 		_show_perks()
 	elif _show_kind != "":
@@ -435,6 +452,15 @@ func _parse_args() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a == "--autoplay":
 			_autoplay = true
+			if Progression.forced_rank < 0:
+				Progression.forced_rank = 0
+		elif a.begins_with("--diff="):
+			difficulty = clampi(int(a.substr(7)), 0, DIFF_HP.size() - 1)
+		elif a.begins_with("--meta="):
+			if a.substr(7).length() == Progression.KINDS.size():
+				Progression.forced_ranks = a.substr(7)
+			else:
+				Progression.forced_rank = int(a.substr(7))
 		elif a == "--ui":
 			_show_ui = true
 		elif a.begins_with("--show="):
@@ -461,22 +487,36 @@ func _load_level() -> void:
 	_theme = d["theme"]
 
 
+## Частка сили складності для хвилі: перші хвилі майже як на звичайній (гравець
+## розбудовується), а останні — іспит для повністю зведеної оборони.
+func _diff_ramp(wi: int, total: int) -> float:
+	var calm: int = WAVES.size() - 1
+	if wi < calm:
+		return 0.0
+	return lerpf(0.3, 1.0, float(wi - calm) / float(maxi(1, total - 1 - calm)))
+
+
 func _make_waves(lv: int) -> Array:
 	var m: float = LEVEL_MULT[lv]
 	var out: Array = []
-	for wi in WAVES.size():
+	var total: int = WAVES.size() + DIFF_EXTRA_WAVES[difficulty]
+	for wi in total:
+		var base_i: int = mini(wi, WAVES.size() - 1)
+		var extra: int = wi - base_i  # додаткові хвилі складності: та сама остання хвиля, але більша
 		# складність наростає: перша хвиля м'якша, остання — повна
-		var mw: float = lerpf(LEVEL_START_MULT[lv], m, pow(float(wi) / (WAVES.size() - 1), 2.0))
+		var mw: float = lerpf(LEVEL_START_MULT[lv], m, pow(float(base_i) / (WAVES.size() - 1), 2.0))
+		mw *= pow(1.25, float(extra))
+		mw *= lerpf(1.0, DIFF_COUNT[difficulty], _diff_ramp(wi, total))
 		var groups: Array = []
-		for g in WAVES[wi]:
+		for g in WAVES[base_i]:
 			var t: int = g[0]
 			var cnt: int = g[1]
-			var n: int = cnt if t == 2 else int(ceil(cnt * mw))
+			var n: int = cnt + extra if t == 2 else int(ceil(cnt * mw))
 			groups.append([t, n, g[2], float(g[3]) / sqrt(mw)])
 		out.append(groups)
 	if LEVEL_BRUTES[lv] > 0:
-		for wi in [out.size() - 2, out.size() - 1]:
-			out[wi].append([2, LEVEL_BRUTES[lv], 6.0, 5.0])
+		for wi in range(WAVES.size() - 2, total):
+			out[wi].append([2, int(ceil(LEVEL_BRUTES[lv] * lerpf(1.0, DIFF_COUNT[difficulty], _diff_ramp(wi, total)))), 6.0, 5.0])
 	return out
 
 
@@ -891,10 +931,19 @@ func _build_ui() -> void:
 	hp_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hp_row.add_theme_constant_override("separation", 16)
 	root.add_child(hp_row)
+	_preview_label = _make_label("", 34, Color(1.0, 0.95, 0.75))
+	_preview_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_preview_label.offset_left = 40
+	_preview_label.offset_right = -40
+	_preview_label.offset_top = 282
+	_preview_label.offset_bottom = 332
+	_preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_preview_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_preview_label)
 	hp_row.add_child(_make_label(I18n.t("base"), 38))
 	_hp_bar = ProgressBar.new()
-	_hp_bar.max_value = BASE_HP_MAX
-	_hp_bar.value = BASE_HP_MAX
+	_hp_bar.max_value = _base_max
+	_hp_bar.value = _base_max
 	_hp_bar.show_percentage = false
 	_hp_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_hp_bar.custom_minimum_size = Vector2(0, 34)
@@ -1052,7 +1101,7 @@ func _on_spell_requested(kind: String) -> void:
 	if outcome.is_empty():
 		return
 	_burst(_hero.position + Vector3(0, 1.0, 0), 2, 12, 3.5, 3.5)
-	_snd("build", 1.6)
+	_snd("freeze")
 	_vibrate(25)
 	Report.ev(_play_time, "spell_cast", "type=%s affected=%d level=%d" % [kind, int(outcome["hits"]), level + 1])
 
@@ -1081,7 +1130,7 @@ func _confirm_meteor(world: Vector3) -> void:
 	if not _spells.confirm_meteor():
 		return
 	_meteor_fx.launch(world)
-	_snd("spawn", 1.5)
+	_snd("meteor")
 	_vibrate(18)
 
 
@@ -1212,11 +1261,11 @@ func _vibrate(ms: int) -> void:
 
 func _plate_cost(p: Plate) -> int:
 	var costs: Array = KIND[p.kind]["cost"]
-	return costs[mini(p.level, 2)]
+	return costs[mini(p.level, MAX_LV - 1)]
 
 
 func _refresh_plate(p: Plate) -> void:
-	var maxed := p.level >= 3
+	var maxed := p.level >= MAX_LV
 	p.tile.visible = not maxed
 	p.label.visible = not maxed
 	p.icon.visible = not maxed
@@ -1289,10 +1338,11 @@ func _step(delta: float) -> void:
 	if _autoplay:
 		_bot_input()
 	_update_waves(delta)
-	if not _autoplay:
-		_boosts.tick(delta, _hero.position)
-		_spells.tick(delta * float(_perk["spell"]))
-		_meteor_fx.tick(delta)
+	_boosts.tick(delta, _hero.position)
+	_spells.tick(delta * float(_perk["spell"]))
+	_meteor_fx.tick(delta)
+	if _autoplay:
+		_bot_spells(delta)
 	_update_hero(delta)
 	_update_enemies(delta)
 	_update_allies(delta)
@@ -1362,6 +1412,8 @@ func _wave_cleared() -> void:
 	_inter_t = 7.0
 	if not _autoplay:
 		_show_perks()
+	else:
+		_bot_pick_perk()
 
 
 ## Вибір нагороди між хвилями: 3 випадкові з 6, гра на паузі до вибору.
@@ -1402,17 +1454,17 @@ func _show_perks() -> void:
 func _pick_perk(id: String) -> void:
 	match id:
 		"hero_dmg":
-			_perk["hero_dmg"] = float(_perk["hero_dmg"]) * 1.3
+			_perk["hero_dmg"] = float(_perk["hero_dmg"]) + 0.35
 		"tower_rate":
-			_perk["tower_rate"] = float(_perk["tower_rate"]) * 1.15
+			_perk["tower_rate"] = float(_perk["tower_rate"]) + 0.12
 		"tower_dmg":
-			_perk["tower_dmg"] = float(_perk["tower_dmg"]) * 1.2
+			_perk["tower_dmg"] = float(_perk["tower_dmg"]) + 0.15
 		"coins":
-			_perk["coins"] = float(_perk["coins"]) * 1.25
+			_perk["coins"] = float(_perk["coins"]) + 0.15
 		"spell":
-			_perk["spell"] = float(_perk["spell"]) * 1.25
+			_perk["spell"] = float(_perk["spell"]) + 0.25
 		"heal":
-			_base_hp = mini(BASE_HP_MAX, _base_hp + 4)
+			_base_hp = mini(_base_max, _base_hp + 4)
 	Report.ev(_play_time, "perk", "id=%s wave=%d" % [id, _wave])
 	_snd("build", 1.5)
 	if _perk_overlay:
@@ -1429,9 +1481,10 @@ func _finish(won: bool) -> void:
 	_spells.visible = false
 	_stars_earned = 0
 	if won:
-		_stars_earned = 3 if _base_hp >= 18 else (2 if _base_hp >= 10 else 1)
+		var frac := float(_base_hp) / float(_base_max)
+		_stars_earned = 3 if frac >= 0.9 else (2 if frac >= 0.5 else 1)
 		if not _autoplay:
-			Settings.record_stars(level, _stars_earned)
+			Settings.record_stars(level, difficulty, _stars_earned)
 	_report_end("win" if won else "lose")
 	_snd("win" if won else "lose")
 	_joy_id = -1
@@ -1460,8 +1513,8 @@ func _spawn_enemy(t: int) -> void:
 	e_id.append(id)
 	e_type.append(t)
 	e_dist.append(d)
-	e_spd.append(randf_range(E_SPD_MIN[t], E_SPD_MAX[t]) * LEVEL_SPD[level])
-	e_hp.append(E_HP[t] * LEVEL_HP[level])
+	e_spd.append(randf_range(E_SPD_MIN[t], E_SPD_MAX[t]) * LEVEL_SPD[level] * lerpf(1.0, DIFF_SPD[difficulty], _diff_ramp(_wave, _waves.size())))
+	e_hp.append(E_HP[t] * LEVEL_HP[level] * lerpf(1.0, DIFF_HP[difficulty][level], _diff_ramp(_wave, _waves.size())))
 	e_ox.append(randf_range(-off, off))
 	e_oz.append(randf_range(-off, off))
 	e_ph.append(randf() * TAU)
@@ -1582,17 +1635,16 @@ func _cleanup_enemies() -> void:
 			var t := e_type[i]
 			if killed:
 				var wp := Vector3(e_px[i], 0.0, e_pz[i])
-				var cn: float = E_COINS[t] * LEVEL_COIN[level] * _boosts.gold_multiplier() * float(_perk["coins"])
+				var cn: float = E_COINS[t] * LEVEL_COIN[level] * DIFF_COIN[difficulty] * _boosts.gold_multiplier() * float(_perk["coins"])
 				_spawn_coins(wp, int(cn) + (1 if randf() < cn - floorf(cn) else 0))
-				if not _autoplay:
-					_boosts.maybe_drop(wp)
+				_boosts.maybe_drop(wp)
 				_burst(wp + Vector3(0, 0.5, 0), 0, 5 if t != 2 else 14, 3.5, 4.0)
 				_puff(wp + Vector3(0, 0.4, 0), 2 if t != 2 else 7, 1.0 if t != 2 else 1.8)
 				if t == 2:
 					_ring(wp, 1.6)
 					_shake = maxf(_shake, 0.25)
 				if _kill_snd_cd <= 0.0:
-					_snd("kill", randf_range(0.9, 1.2))
+					_snd("enemy_death", randf_range(0.9, 1.15))
 					_kill_snd_cd = 0.05
 			else:
 				_hit_base(E_DMG[t])
@@ -1636,7 +1688,7 @@ func _hit_base(dmg: int) -> void:
 	_leaks_total += 1
 	_base_hp = maxi(0, _base_hp - dmg)
 	_shake = 0.6
-	_snd("hit")
+	_snd("castle_hit")
 	_vibrate(40)
 	_burst(_base_pos + Vector3(0, 1.0, 2.0), 1, 8, 3.0, 3.0)
 	_castle.scale = Vector3(1.06, 0.94, 1.06)
@@ -1721,7 +1773,7 @@ func _update_hero_weapon(delta: float) -> void:
 		return
 	_hero_cd = HERO_CD
 	var fwd := Vector3(-sin(_hero_yaw), 0.0, -cos(_hero_yaw))
-	_spawn_arrow(_hero.position + fwd * 0.7 + Vector3(0, 1.1, 0), tgt, HERO_DMG * float(_perk["hero_dmg"]))
+	_spawn_arrow(_hero.position + fwd * 0.7 + Vector3(0, 1.1, 0), tgt, HERO_DMG * float(_perk["hero_dmg"]) * Progression.multiplier("hero"))
 	_bow_kick = 1.0
 	_snd("hero_shoot", randf_range(0.95, 1.1))
 
@@ -1789,13 +1841,25 @@ func _update_projectiles(delta: float) -> void:
 
 
 func _explode(b: Ball) -> void:
+	## Вибух б'є обмежену кількість найближчих цілей і слабшає до краю:
+	## гармата сильна проти куп, але не знищує всю хвилю одним пострілом.
 	var r2 := b.aoe * b.aoe
+	var hits: Array = []
 	for k in e_id.size():
 		var dx := e_px[k] - b.dest.x
 		var dz := e_pz[k] - b.dest.z
-		if dx * dx + dz * dz <= r2:
-			_src = b.src
-			_damage_enemy(k, b.dmg)
+		var d2 := dx * dx + dz * dz
+		if d2 <= r2:
+			hits.append([d2, e_id[k]])
+	var cap := int(b.aoe * 4.0) + 2
+	if hits.size() > cap:
+		hits.sort_custom(func(x, y): return x[0] < y[0])
+		hits.resize(cap)
+	for h in hits:
+		if not _idx_of.has(h[1]):
+			continue
+		_src = b.src
+		_damage_enemy(_idx_of[h[1]], b.dmg * (1.0 - 0.4 * sqrt(float(h[0]) / r2)))
 	_burst(b.dest + Vector3(0, 0.4, 0), 1, 10, 4.5, 3.0)
 	_burst(b.dest + Vector3(0, 0.4, 0), 2, 6, 3.5, 5.0)
 	_snd("boom", randf_range(0.9, 1.1))
@@ -1822,22 +1886,19 @@ func _update_towers(delta: float) -> void:
 			p.head.rotation.y = lerp_angle(p.head.rotation.y, yaw, 1.0 - exp(-12.0 * delta))
 			if p.cooldown <= 0.0 and absf(angle_difference(p.head.rotation.y, yaw)) < 0.3:
 				var cd: float = st["cd"][li]
-				var dmg: float = float(st["dmg"][li]) * float(_perk["tower_dmg"])
-				if not _autoplay and p.kind == "crossbow":
-					dmg *= Progression.multiplier("crossbow")
+				var dmg: float = float(st["dmg"][li]) * float(_perk["tower_dmg"]) * Progression.multiplier(p.kind)
 				p.cooldown = cd
 				p.recoil = 1.0
 				var muzzle: Vector3 = p.tower.get_meta("muzzle")
 				var from: Vector3 = p.head.to_global(muzzle)
 				if p.kind == "crossbow":
 					_spawn_arrow(from, tgt, dmg, "crossbow")
-					_snd("shoot", randf_range(0.95, 1.1))
+					_snd("crossbow", randf_range(0.95, 1.1))
 				else:
 					var aoe: float = st["aoe"][li]
-					if not _autoplay:
-						aoe *= Progression.multiplier("cannon")
+					aoe *= 1.0 + 0.05 * float(Progression.rank("cannon"))
 					_spawn_ball(from, tgt, dmg, aoe)
-					_snd("boom", 1.3)
+					_snd("cannon", randf_range(0.95, 1.05))
 					_burst(from, 2, 4, 2.0, 2.0)
 		if p.head:
 			p.head.position.z = p.recoil * 0.12
@@ -1858,8 +1919,7 @@ func _update_barracks(p: Plate, delta: float) -> void:
 			a.plate = p
 			a.pos = p.pos + Vector3(0, 0, 1.4)
 			a.max_hp = float(KIND["barracks"]["hp"][li])
-			if not _autoplay:
-				a.max_hp *= Progression.multiplier("barracks")
+			a.max_hp *= Progression.multiplier("barracks")
 			a.hp = a.max_hp
 			a.home = _rally + Vector3(randf_range(-1.3, 1.3), 0.0, randf_range(-1.0, 1.0))
 			a.phase = randf() * TAU
@@ -1898,7 +1958,7 @@ func _update_allies(delta: float) -> void:
 		if engaged and dist < 1.25 and a.cd <= 0.0:
 			a.cd = 0.55
 			a.swing = 1.0
-			var dmg: float = KIND["barracks"]["dmg"][a.plate.level - 1]
+			var dmg: float = float(KIND["barracks"]["dmg"][a.plate.level - 1]) * float(_perk["tower_dmg"]) * Progression.multiplier("barracks")
 			for k in e_id.size():
 				var dx := e_px[k] - a.pos.x
 				var dz := e_pz[k] - a.pos.z
@@ -1997,7 +2057,7 @@ func _update_plates(delta: float) -> void:
 		var a := lerpf(p.label.modulate.a, 0.3 if near else 1.0, 1.0 - exp(-12.0 * delta))
 		p.label.modulate.a = a
 		p.sub_label.modulate.a = a
-		if p.level >= 3:
+		if p.level >= MAX_LV:
 			continue
 		var dx: float = p.pos.x - hp.x
 		var dz: float = p.pos.z - hp.z
@@ -2055,15 +2115,14 @@ func _complete_plate(p: Plate) -> void:
 	tw.tween_property(p.tower, "scale", Vector3.ONE, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_burst(p.pos + Vector3(0, 0.3, 0), 1, 14, 4.0, 3.0)
 	_burst(p.pos + Vector3(0, 0.5, 0), 2, 10, 4.0, 5.0)
-	_snd("build", 1.0 + 0.2 * (p.level - 1))
+	_snd("build" if p.level == 1 else "upgrade", 1.0)
 	_vibrate(35)
 	p.spawn_timer = 0.3
 	if p.kind == "barracks":
 		for a in _allies:
 			if a.plate == p:
 				a.max_hp = float(KIND["barracks"]["hp"][p.level - 1])
-				if not _autoplay:
-					a.max_hp *= Progression.multiplier("barracks")
+				a.max_hp *= Progression.multiplier("barracks")
 				a.hp = a.max_hp
 	_refresh_plate(p)
 	_rebuild_obstacles()
@@ -2169,7 +2228,7 @@ func _render_enemies() -> void:
 		var pos := Vector3(e_px[i], bob * 0.1, e_pz[i])
 		_b_enemy[t].add(pos, _path_yaw(e_dist[i]), sc, sc * (1.0 + bob * 0.07), sc)
 		if t == 2:
-			var ratio := clampf(e_hp[i] / (float(E_HP[2]) * LEVEL_HP[level]), 0.0, 1.0)
+			var ratio := clampf(e_hp[i] / (float(E_HP[2]) * LEVEL_HP[level] * lerpf(1.0, DIFF_HP[difficulty][level], _diff_ramp(_wave, _waves.size()))), 0.0, 1.0)
 			var bp := Vector3(e_px[i] - 0.75, 2.9, e_pz[i]) + toward_cam * 0.5
 			_b_hp_bg.add(bp, 0.0, 1.0, 1.0, 1.0)
 			_b_hp_fg.add(bp + toward_cam * 0.04, 0.0, maxf(0.01, ratio), 1.0, 1.0)
@@ -2258,13 +2317,15 @@ func _update_hud() -> void:
 	_wave_label.text = I18n.t("wave") % [mini(_wave + 1, _waves.size()), _waves.size()]
 	if _phase == 0:
 		_sub_label.text = I18n.t("next_wave") % maxi(1, int(ceil(_inter_t)))
+		_preview_label.text = ""
 		if _wave < _waves.size():
 			var cnt := [0, 0, 0]
 			for g in _waves[_wave]:
 				cnt[int(g[0])] += int(g[1])
-			_sub_label.text += "\n" + I18n.t("preview") % cnt
+			_preview_label.text = I18n.t("preview") % cnt
 	else:
 		_sub_label.text = ""
+		_preview_label.text = ""
 	if _built_any and _hint_label.visible:
 		_hint_label.visible = false
 	elif _play_time > 6.0 and _hint_label.text != I18n.t("hint_build"):
@@ -2273,21 +2334,63 @@ func _update_hud() -> void:
 
 # ---------- Тестовий бот і скріншоти ----------
 
+## Бот бере перк як середній гравець: 3 випадкові, з них найкорисніший.
+func _bot_pick_perk() -> void:
+	var ids: Array = PERK_IDS.duplicate()
+	ids.shuffle()
+	ids = ids.slice(0, 3)
+	var prio := ["tower_dmg", "tower_rate", "hero_dmg", "spell", "coins", "heal"]
+	if _base_hp <= _base_max / 2:
+		prio.push_front("heal")
+	for id in prio:
+		if ids.has(id):
+			_pick_perk(id)
+			return
+
+
+## Бот кидає закляття, коли на полі купа ворогів.
+func _bot_spells(delta: float) -> void:
+	_bot_spell_t -= delta
+	if _bot_spell_t > 0.0 or e_px.size() < 8:
+		return
+	_bot_spell_t = 1.0
+	var out: Dictionary = _spells.activate("freeze", e_px, e_pz)
+	if not out.is_empty():
+		Report.ev(_play_time, "spell_cast", "type=freeze affected=%d level=%d" % [int(out["hits"]), level + 1])
+	if _spells.begin_targeting():
+		var tgt: Vector2 = _spells.suggested_target(e_px, e_pz)
+		if _spells.confirm_meteor():
+			_meteor_fx.launch(Vector3(tgt.x, 0.0, tgt.y))
+
+
 func _bot_input() -> void:
 	var hp := _hero.position
 	var goal := Vector3.ZERO
 	var has_goal := false
 	var stop_dist := 0.5
-	# 1) плитка, на яку вистачає монет
+	# 1) ціль як у людини: два арбалети, далі гармати на максимум, потім решта
 	var best: Plate = null
-	var best_rem := 1 << 30
+	var best_score := 1e9
+	var xbows := 0
 	for p in _plates:
-		if p.level >= 3:
+		if p.kind == "crossbow" and p.level > 0:
+			xbows += 1
+	for p in _plates:
+		if p.level >= MAX_LV:
 			continue
 		var rem: int = _plate_cost(p) - p.progress
-		if rem < best_rem and (rem <= _carried or p.progress > 0):
-			best_rem = rem
+		var score := float(rem)
+		if p.kind == "cannon" and xbows >= 2:
+			score -= 1000.0
+		elif p.kind == "crossbow" and p.level == 0 and xbows < 2:
+			score -= 2000.0
+		if p.progress > 0:
+			score -= 500.0
+		if score < best_score:
+			best_score = score
 			best = p
+	if best != null and _carried < mini(_plate_cost(best) - best.progress, 40):
+		best = null
 	if best != null and _carried > 0:
 		goal = best.pos
 		has_goal = true
@@ -2303,7 +2406,13 @@ func _bot_input() -> void:
 				goal = c.pos
 				has_goal = true
 	if not has_goal:
-		goal = Vector3(0, 0, 6)
+		# стоїмо біля передового ворога й стріляємо, а не на плитці
+		var lead := _furthest_in_range(Vector3.ZERO, 100.0)
+		if lead >= 0:
+			goal = Vector3(e_px[lead], 0.0, e_pz[lead])
+			stop_dist = 5.0
+		else:
+			goal = _hero_start
 	var to := goal - hp
 	to.y = 0.0
 	var dist := to.length()
